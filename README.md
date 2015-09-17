@@ -6,7 +6,7 @@ Data analysis library for fitting and clustering
 To build the program issue the command:
 
 ```
-g++ src/*.cc -lgsl -lblas -o richtool
+g++ -std=c++11 src/*.cc -lgsl -lblas -o richtool
 ```
 
 # License
