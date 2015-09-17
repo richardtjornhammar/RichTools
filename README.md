@@ -6,8 +6,7 @@ Data analysis library for fitting and clustering
 To build the program either issue the command:
 
 ```
-cmake .
-make
+g++ src/*.cc -lgsl -lblas -o richtool
 ```
 
 # License
