@@ -402,7 +402,7 @@ fitting::shape_fit_tot(	gmat *P , gmat *Q ,	// IN
 }
 
 void
-fitting::invert_fit( gmat *U, gvec *t, gmat *invU, gvec *invt ) {
+fitting::inver_fit( gmat *U, gvec *t, gmat *invU, gvec *invt ) {
 	if( invU->size1!=U->size1 || invU->size2!=U->size2 || t->size!=invt->size)
 		std::cout << "ERROR IN DIMENSIONS"<< std::endl;
 	invert_matrix(U,invU);

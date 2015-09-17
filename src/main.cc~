@@ -206,6 +206,7 @@ int main (int argc, char **argv) {
 	gsl_vector_set_all ( cw , 1.0 );
 	gsl_vector_set_all ( cn , 1.0 );
 
+
 	richanalysis::clustering	calg;
 	richanalysis::fitting		falg;
 	richanalysis::tensorIO		tIO;

@@ -1,6 +1,6 @@
 To install the program issue the command
 
-g++ src/*.cc -lgsl -lblas -o richtool
+g++ -std=c++11 src/*.cc -lgsl -lblas -o richtool
 
 For any comments please contact:
 richard.tjornhammar@gmail.com

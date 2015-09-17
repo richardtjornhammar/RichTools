@@ -117,7 +117,7 @@ namespace richanalysis {
 	void	apply_fit	( particles px	, gmat *U, gvec *t); 
 
     //! invert transformation
-	void	invert_fit	( gmat *U, gvec *t, gmat *invU, gvec *invt );
+	void	inver_fit	( gmat *U, gvec *t, gmat *invU, gvec *invt );
 
   private:
 	ftyp f_;
