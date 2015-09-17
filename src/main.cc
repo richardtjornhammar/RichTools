@@ -181,6 +181,7 @@ int main (int argc, char **argv) {
 			std::cout << "FATAL:: FAILED TO OPEN FILE" << std::endl;
 			return(1);
 	}
+	std::string ns=std::to_string(N);
 
 	int D		= coord_space.size();
 	int B		= carth_space.size();
@@ -191,6 +192,10 @@ int main (int argc, char **argv) {
 	gmat *CRT	= gsl_matrix_calloc( DIM, B );
 	gmat *CEN	= gsl_matrix_calloc( DIM, N );
 	gmat *CNT	= gsl_matrix_calloc( DIM, N );
+
+	gmat *C0T	= gsl_matrix_calloc( DIM, N );
+	gmat *C0N	= gsl_matrix_calloc( DIM, N );
+
 	set_coordinate_matrix( CRD, coord_space );
 	set_coordinate_matrix( CRT, carth_space );
 
@@ -213,21 +218,42 @@ int main (int argc, char **argv) {
 	calg.gsl_kmeans(CRD, w,CEN,nw);
 	calg.gsl_kmeans(CRT,cw,CNT,cn);
 
+	gsl_matrix_memcpy (C0T, CNT);
+	gsl_matrix_memcpy (C0N, CEN);
+
 	gmat *U		= gsl_matrix_calloc( DIM, DIM );
 	gvec *t		= gsl_vector_calloc( DIM );
 	gmat *iU	= gsl_matrix_calloc( DIM, DIM );
 	gvec *it	= gsl_vector_calloc( DIM );
 
-	std::cout << "::::INFO::::"<< std::endl;
+	std::cout << "::::INFO::::" << std::endl;
 	tIO.output_matrix(CEN);
 
-	ftyp rmsd = falg.kabsch_fit(CEN,CNT,nw,U,t);
+	ftyp min_rmsd=1.0E10;
+	int I=0,J=0;
+	for(int i=0;i<N-1;i++) {
+		for(int j=i+1;j<N-1;j++) {
+			gsl_matrix_memcpy (CEN,C0N);
+			gsl_matrix_memcpy (CNT,C0T);
+			gsl_matrix_swap_columns ( CNT, i, j );
+			ftyp rmsd = falg.kabsch_fit(CEN,CNT,nw,U,t);
+			if(rmsd<min_rmsd){
+				I=i; J=j;
+				min_rmsd=rmsd;
+			}
+		}
+	}
+	std::cout << "INFO::" << I << " " << J << std::endl;
+
+	fIO.output_pdb("cd0n"+ns+".pdb", CEN, nw);
+	fIO.output_pdb("ct0n"+ns+".pdb", CNT, cn);
+
 	falg.invert_fit(U,t,iU,it);
-	falg.apply_fit(CNT,iU,it);
+	falg.apply_fit(CNT,iU,it);	// for putting it back in the original pos
 
 	tIO.output_matrix(CNT);
 
-	std::cout << "::::INFO::::"<< rmsd << std::endl;	
+	std::cout << "::::INFO::::"<< min_rmsd << std::endl;	
 
 	if(verbose) {
 		std::cout << "INFO::HAVE CENTROIDS::" <<std::endl;
@@ -238,15 +264,16 @@ int main (int argc, char **argv) {
 		std::cout << "###########################"<<std::endl;
 	}
 
-	std::string ns=std::to_string(N);
-	fIO.output_pdb("cld"+ns+".pdb", coord_space, w);
+//	fIO.output_pdb("cld"+ns+".pdb", coord_space, w);
 
 	gsl_matrix_free(CRD);
 	gsl_matrix_free(CEN);
+	gsl_matrix_free(C0N);
 	gsl_vector_free(nw);
 	gsl_vector_free(w);
 	gsl_matrix_free(CRT);
 	gsl_matrix_free(CNT);
+ 	gsl_matrix_free(C0T);
 	gsl_vector_free(cw);
 	gsl_vector_free(cn);
 	gsl_matrix_free(U);
