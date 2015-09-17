@@ -39,72 +39,20 @@
 //L  Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
 //L  MA 02111-1307 USA
 
-//// C/C++ STUFF
-#include <cstdlib>
-#include <vector>
-#include <string>
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <math.h>
-#include <algorithm>
-
 #include "richfit.hh"
+#include "iofunc.hh"
 
-int output_geometry_to_file(std::vector<std::pair<std::string,std::vector<ftyp> > > px, std::string filename){
-	const char *c_filename = filename.c_str();
-	std::ofstream outp_coord;
-	outp_coord.open(c_filename);
-
-	int n=px.size();
-	outp_coord << n << std::endl;
-	outp_coord << "FLUSHED COORDS" << std::endl;
-	for(int i=0;i<n;i++){
-		outp_coord << " " << px[i].first << " " << px[i].second[XX] << " " 
-			<< px[i].second[YY] << " " << px[i].second[ZZ] << std::endl; 
-	}
-	outp_coord.close();
-
-	return(0);
-}
-
-int output_geometry(std::vector<std::pair<std::string,std::vector<ftyp> > > px) {
-	int n=px.size();
-	std::cout << n << std::endl;
-	std::cout << "FLUSHED COORDS" << std::endl;
-	for(int i=0;i<n;i++){
-		std::cout << " " << px[i].first << " " << px[i].second[XX] << " " 
-			<< px[i].second[YY] << " " << px[i].second[ZZ] << std::endl; 
-	}
-	return(0);
-}
-
-int output_tagged_geometry(std::vector<std::pair<std::string,std::vector<ftyp> > > px, std::vector<int > is_ring, std::string label){
-	int n=px.size();
-	std::cout << n << std::endl;
-	std::cout << "FLUSHED RING COORDS" << std::endl;
-	for(int i=0;i<n;i++){
-		if(is_ring[i])
-			std::cout << " " << label << " " << px[i].second[XX] << " " 
-			<< px[i].second[YY] << " " << px[i].second[ZZ] << std::endl; 
-		else
-			std::cout << " " << px[i].first << " " << px[i].second[XX] << " " 
-			<< px[i].second[YY] << " " << px[i].second[ZZ]  <<std::endl; 
-	}
-	return(0);	
-}
-
-int calc_distance_matrix(gmat *A, std::vector<std::pair<std::string,std::vector<ftyp> > >  coord_space) {
+int calc_distance_matrix(gmat *A, particles coord_space) {
 	int D = A->size1;
 	if( A->size1 == A->size2 && A->size1 == coord_space.size()) {
 		for(int i=0;i<D; i++){
 			for(int j=0;j<D;j++){
-				std::vector<ftyp> diff;
-				diff.push_back(coord_space[i].second[XX]-coord_space[j].second[XX]);
-				diff.push_back(coord_space[i].second[YY]-coord_space[j].second[YY]);
-				diff.push_back(coord_space[i].second[ZZ]-coord_space[j].second[ZZ]);
-				ftyp len = sqrt(diff[XX]*diff[XX]+diff[YY]*diff[YY]+diff[ZZ]*diff[ZZ]);
-				gsl_matrix_set( A, i, j,	len	);
+				ftyp dx,dy,dz;
+				dx = gsl_vector_get(coord_space[i].second,XX)-gsl_vector_get(coord_space[j].second,XX);
+				dy = gsl_vector_get(coord_space[i].second,YY)-gsl_vector_get(coord_space[j].second,YY);
+				dz = gsl_vector_get(coord_space[i].second,ZZ)-gsl_vector_get(coord_space[j].second,ZZ);
+				ftyp len = sqrt(dx*dx+dy*dy+dz*dz);
+				gsl_matrix_set( A, i, j, len );
 			}
 		}
 		return 0;	
@@ -115,12 +63,12 @@ int calc_distance_matrix(gmat *A, std::vector<std::pair<std::string,std::vector<
 }
 
 
-int set_coordinate_matrix( gmat *A, std::vector<std::pair<std::string,std::vector<ftyp> > >  coord_space) {
+int set_coordinate_matrix( gmat *A, particles coord_space) {
 	int D = A->size2;
 	if( A->size2 == coord_space.size()) {
 		for(int i=0;i<D; i++){
 			for(int j=XX;j<=ZZ;j++){
-				gsl_matrix_set( A, j, i,	coord_space[i].second[j]	);
+				gsl_matrix_set( A, j, i, gsl_vector_get(coord_space[i].second,j)	);
 			}
 		}
 		return 0;	
@@ -185,62 +133,14 @@ std::vector<int > find_via_distance( gmat *A, ftyp level ) {
 	return is_tmp;
 }
 
-
-std::vector<std::pair<std::string,std::vector<ftyp> > > read_xyz(std::string filename){
-	const char *c_filename = filename.c_str();
-	std::ifstream inp_molecule;
-	inp_molecule.open(c_filename);
-	int Nparts = 0;
-	std::string title;
-	std::vector<ftyp> BOX;
-	BOX.push_back(1.0); BOX.push_back(1.0); BOX.push_back(1.0);
-	std::vector<std::pair<std::string,std::vector<ftyp> > > particles;
-	if(inp_molecule.is_open()){
-		std::string iline;
-		getline(inp_molecule,iline);
-		std::stringstream data(iline);
-		data >> Nparts;
-		getline(inp_molecule, iline);
-		title = iline;
-		std::stringstream atad(iline);
-		std::string wrd; atad >> wrd;
-		if( wrd == "BOX" ){
-			atad >> BOX[XX]; atad >> BOX[YY]; atad >> BOX[ZZ];
-		}
-		while( !(inp_molecule.eof()) ){
-//	DECLARATIONS
-			ftyp r[3];
-			std::pair<std::string, std::vector<ftyp> > svpair;
-			std::string atom;
-			std::vector<ftyp> rvec;
-//	ACTUAL IO
-			getline(inp_molecule,iline);
-			std::stringstream    data(iline);
-			data >> atom >> r[0] >> r[1] >> r[2];
-			rvec.push_back(r[0]*BOX[XX]);
-			rvec.push_back(r[1]*BOX[YY]);
-			rvec.push_back(r[2]*BOX[ZZ]);
-			svpair.first = atom; svpair.second = rvec;
-			if(svpair.first=="")
-				continue;
-			particles.push_back(svpair);
-		}
-		inp_molecule.close();
-	}else{
-		std::cout << "FATAL:: COULD NOT OPEN FILE " << std::endl;
-	}
-
-	return particles;
-}
-
 int main (int argc, char **argv) {
 
 	std::string 	filename[1];
 	std::string 	ext("xyz");
 	std::ifstream 	inp_molecule;
-	int ioOpen[1]	=	{0};
 
-	std::vector<std::pair<std::string, std::vector<ftyp> > > coord_space;
+	richanalysis::fileIO fIO;
+	particles coord_space;
 
 	switch( argc ) {
 		case 2: {
@@ -248,8 +148,9 @@ int main (int argc, char **argv) {
 				filename[0] = tmpline;
 				std::size_t found = tmpline.find(ext);
 				if (found!=std::string::npos){
-					std::cout << "INFO:: FOUND XYZ INPUT NAME" << std::endl;
-					coord_space = read_xyz(filename[0]);
+					std::cout << "INFO:: FOUND XYZ INPUT NAME = " << filename[0] << std::endl;
+					coord_space = fIO.read_xyz(filename[0]);
+					std::cout << "INFO:: DONE READ" << std::endl;
 				}
 			}	
 			break;
@@ -258,10 +159,10 @@ int main (int argc, char **argv) {
 			return(1);
 	}
 
-	output_geometry(coord_space);
 	int D		= coord_space.size();
-
 	std::cout << "INFO:: GOT DIMENSION " << D << std::endl;
+
+	fIO.output_geometry(coord_space);
 
 	gmat *CRD	= gsl_matrix_alloc( DIM, D );
 	gsl_matrix_set_all ( CRD, 0.0	);	
@@ -277,6 +178,7 @@ int main (int argc, char **argv) {
 
 	richanalysis::clustering	calg;
 	richanalysis::tensorIO		tIO;
+
 	calg.gsl_kmeans(CRD,w,CEN,nw);
 
 	std::cout << "INFO::HAVE CENTROIDS::" <<std::endl;
@@ -286,6 +188,7 @@ int main (int argc, char **argv) {
 	std::cout << D << std::endl;
 	std::cout << "INFO::COLOURED COORDS::" <<std::endl;
 	tIO.output_matrix_label(CRD,w);
+	fIO.output_pdb("clustered.pdb", coord_space, w);
 
 	gsl_matrix_free(CRD);
 	gsl_matrix_free(CEN);

@@ -134,7 +134,6 @@ namespace richanalysis {
 
     //! Routines for doing rotation
 	int	assign_quaterion( gvec *x, ftyp angle );
-
 	int	rotate_coord( gvec *x );
   private:
 	int	bSet_;

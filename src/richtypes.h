@@ -42,6 +42,7 @@
 #include <cstdlib>
 #include <vector>
 #include <string>
+#include <math.h>
 
 //// GSL STUFF
 #include <gsl/gsl_matrix.h>
@@ -57,3 +58,6 @@
 typedef double ftyp;
 typedef gsl_matrix gmat;
 typedef gsl_vector gvec;
+
+typedef std::pair<std::string, gvec * > particle;
+typedef std::vector< particle > particles;

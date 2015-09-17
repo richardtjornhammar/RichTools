@@ -1,4 +1,4 @@
-/*	richtypes.h	*/
+/*	iofunc.hh	*/
 //C Copyright (C) 2015 Richard Tjörnhammar
 //L
 //L  This library is free software and is distributed under the terms
@@ -39,21 +39,23 @@
 //L  Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
 //L  MA 02111-1307 USA
 
-#include <cstdlib>
-#include <vector>
-#include <string>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include "richtypes.h"
 
-//// GSL STUFF
-#include <gsl/gsl_matrix.h>
-#include <gsl/gsl_blas.h>
-#include <gsl/gsl_linalg.h>
-#include <gsl/gsl_permutation.h>
+namespace richanalysis {
 
-#define	DIM	3
-#define XX	0
-#define YY	1
-#define ZZ	2
-
-typedef double ftyp;
-typedef gsl_matrix gmat;
-typedef gsl_vector gvec;
+  class fileIO
+  {
+  public:
+	//! I
+	particles read_xyz(std::string filename);
+	//! O
+	void output_geometry( particles px );
+	void output_geometry( particles px, std::string filename);
+	void output_geometry( particles px, std::string filename, std::string label);
+	//! SPECIAL FORMAT
+	void output_pdb( std::string filename, particles px, gvec *v);
+  };
+}
