@@ -50,6 +50,13 @@
 
 namespace richanalysis {
 
+std::vector<std::vector<int> > 
+simple_ops::all_permutations(std::vector<int> v) {
+	std::vector<std::vector<int> > mv;
+	do { mv.push_back(v) ; } while (std::next_permutation(v.begin(), v.end()));
+	return mv;
+}
+
 void 
 tensorIO::output_vector(gvec *v){
 	std::cout <<"::INFO::VECTOR::";

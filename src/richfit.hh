@@ -48,6 +48,7 @@ namespace richanalysis {
   public:
 	ftyp square( ftyp x ) { return x*x; }
 	ftyp abs( ftyp x ) { return (x>0)?(x):(-1*x); }
+	std::vector<std::vector<int> > all_permutations(std::vector<int> v);
   };
 
   class clustering : public simple_ops
