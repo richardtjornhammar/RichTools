@@ -231,19 +231,39 @@ int main (int argc, char **argv) {
 
 	ftyp min_rmsd=1.0E10;
 	int I=0,J=0;
-	for(int i=0;i<N-1;i++) {
-		for(int j=i+1;j<N-1;j++) {
-			gsl_matrix_memcpy (CEN,C0N);
-			gsl_matrix_memcpy (CNT,C0T);
-			gsl_matrix_swap_columns ( CNT, i, j );
-			ftyp rmsd = falg.kabsch_fit(CEN,CNT,nw,U,t);
-			if(rmsd<min_rmsd){
-				I=i; J=j;
-				min_rmsd=rmsd;
-			}
+	std::vector<int> iv;
+	for(int i=0;i<N;i++)
+		iv.push_back(i);
+	gvec *gv = gsl_vector_calloc(DIM);	
+	std::vector<std::vector<int> > imv = calg.all_permutations(iv);
+	for(int j=0;j<imv.size();j++){
+		gsl_matrix_memcpy (CEN,C0N);
+		for(int i=0;i<iv.size();i++) {
+			gsl_matrix_get_col (gv, C0T, i);
+			gsl_matrix_set_col (CNT, imv[j][i], gv );
+		}
+		ftyp rmsd = falg.kabsch_fit(CEN,CNT,nw,U,t);
+		if(rmsd<min_rmsd){
+			J=j; 
+			min_rmsd=rmsd;
 		}
 	}
-	std::cout << "INFO::" << I << " " << J << std::endl;
+	std::cout << "INFO:: " << J << " ";
+	for(int i=0;i<iv.size();i++)
+		std::cout << " " << imv[J][i];
+	std::cout << std::endl;
+
+	std::cout << "INFO::labels in\n ";
+	for(int i=0;i<w->size;i++)
+		std::cout <<  " "  << (int)gsl_vector_get(w,i);
+	std::cout << std::endl;
+
+	std::cout << "INFO::are equivalent to\n ";
+	for(int i=0;i<cw->size;i++)
+		std::cout <<  " "  << imv[J][(int)gsl_vector_get(cw,i)];
+	std::cout << std::endl;
+
+
 
 	fIO.output_pdb("cd0n"+ns+".pdb", CEN, nw);
 	fIO.output_pdb("ct0n"+ns+".pdb", CNT, cn);
