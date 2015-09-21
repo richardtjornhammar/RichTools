@@ -64,7 +64,7 @@ linalg::calc_centroid( gmat *P, gvec *w, gvec *p0  ){
 	for( unsigned int i=0 ; i<w->size ; i++)
 		sum+=gsl_vector_get(w,i);
 	if( p0->size == P->size1 && w->size == P->size2 ) {
-		for( unsigned int i=0 ; i<p0->size ; i++ ){
+		for( unsigned int i=0 ; i<p0->size ; i++ ) {
 			ftyp val=0.0;
 			for( unsigned int j=0 ; j<w->size; j++ ){
 				val+=gsl_matrix_get(P,i,j)*gsl_vector_get(w,j)/sum;

@@ -59,14 +59,12 @@ namespace richanalysis {
 		public:
 			cluster() { bSet_[0]=0; bSet_[1]=0; bSet_[2]=0; bSet_[3]=0; };
 			std::vector<int>	get_labels  ( void );
-			void			set_labels  ( std::vector<int> );
 			void			alloc_space ( int, int );
 			void			seM ( int, int, ftyp );
 			void			sev ( int, ftyp );
 			void			seC ( int, int, ftyp );
 			void			sew ( int, ftyp );
-			int 			set_matrix( particles coord_space ); 
-//	THIS IS BAD AND SHOULD BE CHANGED FOR LATER (BELOW 4)
+			int 			set_matrix( particles );  
 			void			print_all( void ) {
 							output_matrix( M_ );
 							output_vector(vc_ );
@@ -94,13 +92,19 @@ namespace richanalysis {
 
 	class node_indices : public fitting {
 		public:
-			node_indices() {}
-			ftyp	find_index_relation( cluster c1, cluster c2 );
-			std::vector<int> get_indices(){ return idx_; };
+			node_indices() { bDirRel_=0;bUtSet_=0; U_ = gsl_matrix_calloc( DIM, DIM ); t_ = gsl_vector_calloc( DIM ); }
+			ftyp			find_index_relation( cluster c1, cluster c2 );
+			std::vector<int> 	get_indices(void){ return idx_; };
+			int			direction_relation(void){ return bDirRel_;};
+			int			have_transform(void){ return bUtSet_; };
+			particles 		apply_rotation_translation( particles px );
 		private:
-			int bHaveRel_;
+			int bDirRel_;
 			std::vector<int> idx_;
 			int N_,M_,I_,J_;
+			int bUtSet_;
+			gmat *U_;
+			gvec *t_;
 	};
 
 }

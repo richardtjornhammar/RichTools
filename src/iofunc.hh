@@ -73,6 +73,7 @@ namespace richanalysis {
 			void output_geometry( particles px, std::string filename, std::string label);
 		//! SPECIAL FORMAT
 			void output_pdb( std::string filename, particles px, gvec *v);
+			void output_pdb( std::string filename, particles px, std::vector<int> ndx );
 			void output_pdb( std::string filename, gmat *M	, gvec *v);
 	};
 

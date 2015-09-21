@@ -94,6 +94,15 @@ cluster::sev ( int i, ftyp val ) {
 		gsl_vector_set(vc_,i,val);
 }
 
+std::vector<int>	
+cluster::get_labels( void ){
+	std::vector<int> ndx;
+	if( bSet_[0] && bSet_[1] && bSet_[2] && bSet_[3] )
+		for(int i=0;i<vc_->size;i++)
+			ndx.push_back(gsl_vector_get(vc_,i));
+	return ndx;
+}
+
 int 
 cluster::set_matrix( particles coord_space ) {
 	int D = M_->size2;
@@ -110,7 +119,6 @@ cluster::set_matrix( particles coord_space ) {
 		return -1;
 	}
 }
-
 
 int 
 clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw ){
@@ -187,6 +195,36 @@ clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw ){
 	return 0;
 }
 
+particles 
+node_indices::apply_rotation_translation( particles px ){
+	if(bUtSet_){
+		gsl_vector *pos = gsl_vector_alloc( DIM );
+		gsl_vector *res = gsl_vector_alloc( DIM );
+		gsl_vector *xv  = gsl_vector_alloc( DIM );
+		gsl_vector *tmp = gsl_vector_alloc( DIM );
+		gsl_matrix *Utm = gsl_matrix_alloc( DIM ,DIM );		
+
+		int L = ((int)px.size());
+		gsl_vector_memcpy(tmp,t_);	
+		gsl_matrix_memcpy(Utm,U_);
+
+		tensorIO tIO;
+		tIO.output_matrix(Utm);
+	
+		for( int i=0 ; i<L ; i++ ){
+			gsl_vector_memcpy(xv,px[i].second);	
+			gsl_blas_dgemv(CblasNoTrans, 1.0, Utm, xv, 0.0, res);
+			gsl_vector_add(res,tmp);
+			gsl_vector_add(xv,res);
+			gsl_vector_memcpy(px[i].second,xv);
+		}
+
+		gsl_vector_free(xv); gsl_vector_free(tmp); gsl_vector_free(res); gsl_vector_free(pos);
+		gsl_matrix_free(Utm);
+	}
+	return px;
+}
+
 ftyp
 node_indices::find_index_relation(cluster c1, cluster c2){
 	ftyp min_rmsd	= 1.0E10;
@@ -207,8 +245,11 @@ node_indices::find_index_relation(cluster c1, cluster c2){
 	gmat *CEN	= gsl_matrix_calloc( DIM, N );
 	gvec *gv 	= gsl_vector_calloc( DIM );
 
-	c1.copyC(C0T);
-	c2.copyC(C0N);
+	c1.copyC(C0N);
+	c2.copyC(C0T);
+
+	gmat *Ut = gsl_matrix_calloc( DIM, DIM );
+	gvec *tt = gsl_vector_calloc( DIM );
 
 	std::vector<int> iv;
 	for(int i=0;i<N;i++)
@@ -224,12 +265,22 @@ node_indices::find_index_relation(cluster c1, cluster c2){
 		ftyp rmsd = kabsch_fit(CEN,CNT,U,t);
 		if(rmsd<min_rmsd){
 			J=j; 
-			min_rmsd=rmsd;
+			min_rmsd=rmsd;	
+			gsl_matrix_memcpy (Ut, U);
+			gsl_vector_memcpy (tt, t);
 		}
 	}
 
 	for(int i=0;i<iv.size();i++)
 		idx_.push_back(imv[J][i]);
+
+	bDirRel_=2*(c1.length_M()>c2.length_M())-1;
+
+	if(!have_transform()){
+		gsl_matrix_memcpy (U_, Ut);
+		gsl_vector_memcpy (t_, tt);
+		bUtSet_=1;
+	}
 
 	gsl_matrix_free(CNT);
 	gsl_matrix_free(C0N);

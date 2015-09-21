@@ -184,14 +184,36 @@ int main (int argc, char **argv) {
 
 	richanalysis::node_indices nidx;
 	ftyp rmsd = nidx.find_index_relation(cl1,cl2);
-	std::vector<int> ndx = nidx.get_indices();
-
-	std::cout << "INFO::HAVE:: \n ";
-	for(int i=0;i<ndx.size();i++)
-		std::cout << " " << ndx[i];
-	std::cout << std::endl;
-
 	std::cout << ":INFO:RMSD:"<< std::endl << rmsd << std::endl;	
+
+	std::vector<int> rel_ndx = nidx.get_indices();
+	std::vector<int> den_ndx = cl1.get_labels();
+	std::vector<int> crd_ndx = cl2.get_labels();
+	std::vector<int> fio_ndx;
+
+	int icl=1;
+	int nden=0,nmod=0;
+
+	std::cout << "INFO::HAVE::REL " << nidx.direction_relation() << "> \n" ;
+	for(int i=0;i<rel_ndx.size();i++)
+		std::cout << " " << rel_ndx[i];
+
+	std::cout << std::endl;
+	std::cout << "INFO::HAVE::DEN \n ";
+	for(int i=0; i<den_ndx.size(); i++) {
+		nden += den_ndx[i]==icl?1:0;
+	}
+	std::cout << std::endl;
+	std::cout << "INFO::HAVE::CRD \n ";
+	for(int i=0; i<crd_ndx.size(); i++) {
+		fio_ndx.push_back( rel_ndx[crd_ndx[i]] );
+		nmod += rel_ndx[crd_ndx[i]]==icl?1:0;
+	}
+	std::cout << std::endl;
+	std::cout <<"INFO::" << nden << ", " << nmod << std::endl;
+
+	fIO.output_pdb("cld"+ns+".pdb", coord_space, den_ndx);
+	fIO.output_pdb("clm"+ns+".pdb", carth_space, fio_ndx);
 
 	return 0;
 }
