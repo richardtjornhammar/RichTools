@@ -45,6 +45,41 @@
 namespace richanalysis {
 
 void 
+tensorIO::output_vector(gvec *v){
+	std::cout <<"::INFO::VECTOR::"<< std::endl;
+	for(int i=0;i<v->size;i++)
+		std::cout << " " << gsl_vector_get(v,i);
+	std::cout << std::endl;
+	std::cout << std::endl;
+}
+
+void 
+tensorIO::output_matrix_label(gmat *M, gvec *v){
+	std::cout <<"::INFO::MATRIX::"<< std::endl;
+	for(int i=0;i<M->size2;i++){
+		if(M->size2==v->size)
+			std::cout << " " << gsl_vector_get(v,i);
+		for(int j=0;j<M->size1;j++)
+			std::cout << " " << gsl_matrix_get(M,j,i);
+		std::cout << std::endl;	
+	}
+	std::cout << std::endl;
+}
+
+void 
+tensorIO::output_matrix(gmat *M){
+	std::cout <<"::INFO::MATRIX::"<< std::endl;
+	for(int i=0;i<M->size2;i++){
+		for(int j=0;j<M->size1;j++)
+			std::cout << " " << gsl_matrix_get(M,j,i);
+		std::cout << std::endl;	
+	}
+	std::cout << std::endl;
+}
+
+
+
+void 
 fileIO::output_geometry(particles px) {
 	int n=px.size();
 	std::cout << n << std::endl;
@@ -212,3 +247,4 @@ fileIO::output_pdb( std::string filename, gmat *M, gvec *w ) {
 
 
 }
+

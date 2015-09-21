@@ -1,4 +1,4 @@
-/*	iofunc.hh	*/
+/*	simple.hh	*/
 //C Copyright (C) 2015 Richard Tjörnhammar
 //L
 //L  This library is free software and is distributed under the terms
@@ -38,43 +38,14 @@
 //L  The GNU Lesser General Public can also be obtained by writing to the
 //L  Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
 //L  MA 02111-1307 USA
-#ifndef IOFUNC_H
-#define IOFUNC_H
-
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include "richtypes.h"
-
+#ifndef SIMPLE_H
+#define SIMPLE_H
 namespace richanalysis {
-
-	class tensorIO {
+	class simple_ops {
 		public:
-		//! null constructor
-			inline tensorIO() {} //!< Null constructor	
-
-		//! Outputs a gsl matrix with label vector
-			void output_matrix_label(gmat *m, gvec *v);	
-
-		//! Outputs a gsl matrix with label vector
-			void output_matrix(gmat *M);
-
-		//! Outputs a gsl vector
-			void output_vector(gvec *v);
+			ftyp square( ftyp x ) { return x*x; }
+			ftyp abs( ftyp x ) { return (x>0)?(x):(-1*x); }
+			std::vector<std::vector<int> > all_permutations(std::vector<int> v);
 	};
-
-	class fileIO {
-		public:
-		//! I
-			particles read_xyz(std::string filename);
-		//! O
-			void output_geometry( particles px );
-			void output_geometry( particles px, std::string filename);
-			void output_geometry( particles px, std::string filename, std::string label);
-		//! SPECIAL FORMAT
-			void output_pdb( std::string filename, particles px, gvec *v);
-			void output_pdb( std::string filename, gmat *M	, gvec *v);
-	};
-
 }
 #endif

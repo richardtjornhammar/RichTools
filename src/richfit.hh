@@ -38,113 +38,49 @@
 //L  The GNU Lesser General Public can also be obtained by writing to the
 //L  Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
 //L  MA 02111-1307 USA
+#ifndef RICFIT_H
+#define RICFIT_H
 
 #include "richtypes.h"
+#include "simple.hh"
 
 namespace richanalysis {
 
-  class simple_ops
-  {
-  public:
-	ftyp square( ftyp x ) { return x*x; }
-	ftyp abs( ftyp x ) { return (x>0)?(x):(-1*x); }
-	std::vector<std::vector<int> > all_permutations(std::vector<int> v);
-  };
-
-  class clustering : public simple_ops
-  {
-  public:
-    //! null constructor
-	inline clustering() {} //!< Null constructor
-
-    //! performs k-means clustering on the specified data
-	int gsl_kmeans( gmat *, gvec *, gmat *, gvec * );
-
-//	inline const ftyp& f() const { return f_; } 
-  private:
-    ftyp f_;
-  };
-
-  class tensorIO
-  {
-  public:
-    //! null constructor
-	inline tensorIO() {} //!< Null constructor
-
-    //! Outputs a gsl matrix with label vector
-	void output_matrix_label(gmat *m, gvec *v);
-
-    //! Outputs a gsl matrix with label vector
-	void output_matrix(gmat *M);
-
-    //! Outputs a gsl vector
-	void output_vector(gvec *v);
-
-  private:
-	ftyp f_;
-  };
-
-
-  class linalg : public simple_ops
-  {
-  public:
-    //! Linear algebra routines needed for fitting
-	ftyp	v_sum		( gvec *v );
-	int	calc_centroid	( gmat *P , gvec *w , gvec *p0  );
-	int 	calc_vmprod	( gvec *w , gmat *P , gmat *wP  );
-	int	center_matrix	( gmat *P , gvec *p0 	);
-	int	invert_matrix	( gmat *A , gmat *invA	);
-	ftyp	get_det		( gmat *A );
-  private:
-	ftyp f_;
-  };
-
-  class fitting : public linalg 
-  {
-  public:
-    //! null constructor
-	inline	fitting() {} //!< Null constructor
-
-    //! shape fitting
-	ftyp	shape_fit_tot	( gmat *P , gmat *Q ,	// IN
-				  gvec *w1, gvec *w2, 	// IN
-				  gmat *U , gvec *t ,	// OUT 
-				  int II );
-    //! model alignment
-	ftyp	kabsch_fit	( gmat *P	, gmat *Q , gvec *w,	// IN
-				  gmat *U	, gvec *t );		// OUT
-    //! apply the transformation
-	void	apply_fit	( gmat *P	, gmat *U, gvec *t); 
-	void	apply_fit	( particles px	, gmat *U, gvec *t); 
-
-    //! invert transformation
-	void	invert_fit	( gmat *U, gvec *t, gmat *invU, gvec *invt );
-
-  private:
-	ftyp f_;
-  };
-
-  class quaternion
-  {
-  public:
-    //! constructor
-	inline	quaternion() { bSet_=0;  q_= gsl_vector_alloc(4); gsl_vector_set_zero(q_); } //!< Null constructor
-    //! 
-	int	is_complete(){	return bSet_; }
-	void	set_quat( const gvec *q0 ) { bSet_= q0->size==4?gsl_vector_memcpy( q_ , q0 )+1:0; }
-	gvec*	get_quat() { return q_; }
-	void	clear(void){ gsl_vector_set_zero(q_); bSet_=0; }
-    //! class destructor
-	~quaternion() {
-    		gsl_vector_free(q_);
+	class linalg : public simple_ops {
+		public:
+		//! Linear algebra routines needed for fitting
+			ftyp	v_sum		( gvec *v );
+			int	calc_centroid	( gmat *P , gvec *w , gvec *p0  );
+			int 	calc_vmprod	( gvec *w , gmat *P , gmat *wP  );
+			int	center_matrix	( gmat *P , gvec *p0 	);
+			int	invert_matrix	( gmat *A , gmat *invA	);
+			ftyp	get_det		( gmat *A );
 	};
 
-    //! Routines for doing rotation
-	int	assign_quaterion( gvec *x, ftyp angle );
-	int	rotate_coord( gvec *x );
-  private:
-	int	bSet_;
-	gvec 	*q_;
+	class fitting : public linalg {
+		public:
+		//! null constructor
+			inline	fitting() {} //!< Null constructor
+
+		//! shape fitting
+			ftyp	shape_fit_tot	( gmat *P , gmat *Q ,	// IN
+					  	gvec *w1, gvec *w2, 	// IN
+					  	gmat *U , gvec *t ,	// OUT 
+					  	int II );
+		//! model alignment
+			ftyp	kabsch_fit	(	gmat *P	, gmat *Q ,		// IN
+				  		 	gmat *U	, gvec *t );		// OUT
+
+			ftyp	kabsch_fit	(	gmat *P	, gmat *Q , gvec *w,	// IN
+				  		 	gmat *U	, gvec *t );		// OUT
+
+		//! apply the transformation
+			void	apply_fit	( gmat *P	, gmat *U, gvec *t); 
+			void	apply_fit	( particles px	, gmat *U, gvec *t); 
+	
+		//! invert transformation
+			void	invert_fit	( gmat *U, gvec *t, gmat *invU, gvec *invt );
   };
 
 }
+#endif

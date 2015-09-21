@@ -1,4 +1,4 @@
-/*	iofunc.hh	*/
+/*	cluster.cc	*/
 //C Copyright (C) 2015 Richard Tjörnhammar
 //L
 //L  This library is free software and is distributed under the terms
@@ -38,43 +38,57 @@
 //L  The GNU Lesser General Public can also be obtained by writing to the
 //L  Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
 //L  MA 02111-1307 USA
-#ifndef IOFUNC_H
-#define IOFUNC_H
 
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include "richtypes.h"
+#include "quaternion.hh"
 
-namespace richanalysis {
+using namespace richanalysis;
 
-	class tensorIO {
-		public:
-		//! null constructor
-			inline tensorIO() {} //!< Null constructor	
+int	
+quaternion::assign_quaterion( gvec *v, ftyp angle ){
+	if(is_complete() && v->size==3 ){
+		ftyp norm,vx,vy,vz;
+		gvec xo;
+		vx=gsl_vector_get( v, XX );vy=gsl_vector_get( v, YY );vx=gsl_vector_get( v, ZZ );
+  		norm   = 1.0/sqrt(vx*vx+vy*vy+vz*vz);
 
-		//! Outputs a gsl matrix with label vector
-			void output_matrix_label(gmat *m, gvec *v);	
+		gsl_vector_set ( q_ , XX ,  cos(angle*0.5) );
+		gsl_vector_set ( q_ , YY , vx * norm * sin(angle*0.5) );
+		gsl_vector_set ( q_ , ZZ , vy * norm * sin(angle*0.5) );
+		gsl_vector_set ( q_ ,DIM , vz * norm * sin(angle*0.5) );
 
-		//! Outputs a gsl matrix with label vector
-			void output_matrix(gmat *M);
-
-		//! Outputs a gsl vector
-			void output_vector(gvec *v);
-	};
-
-	class fileIO {
-		public:
-		//! I
-			particles read_xyz(std::string filename);
-		//! O
-			void output_geometry( particles px );
-			void output_geometry( particles px, std::string filename);
-			void output_geometry( particles px, std::string filename, std::string label);
-		//! SPECIAL FORMAT
-			void output_pdb( std::string filename, particles px, gvec *v);
-			void output_pdb( std::string filename, gmat *M	, gvec *v);
-	};
-
+		return 0;
+	}else {
+		return 1;
+	}
 }
-#endif
+
+int
+quaternion::rotate_coord( gvec *x ) 
+{
+	ftyp xX,yY,zZ;
+
+	if( is_complete() && x->size==DIM ){
+
+		ftyp q[DIM+1],xo[DIM];
+		q[XX] = gsl_vector_get(q_,XX); q[YY ] = gsl_vector_get(q_,YY );
+		q[ZZ] = gsl_vector_get(q_,ZZ); q[DIM] = gsl_vector_get(q_,DIM);
+
+		xo[XX] = gsl_vector_get(x, XX); 
+		xo[YY] = gsl_vector_get(x, YY); 
+		xo[ZZ] = gsl_vector_get(x, ZZ);
+ 
+		xX = (q[0]*q[0]+q[1]*q[1]-q[2]*q[2]-q[3]*q[3])*xo[XX] + (2*q[1]*q[2] - 2*q[0]*q[3])*xo[YY] + (2*q[1]*q[3] + 2*q[0]*q[2])*xo[ZZ];
+		yY = (2*q[1]*q[2] + 2*q[0]*q[3])*xo[XX] + (q[0]*q[0]-q[1]*q[1] + q[2]*q[2]-q[3]*q[3])*xo[YY] + (2*q[2]*q[3]-2*q[0]*q[1])*xo[ZZ];
+		zZ = (2*q[1]*q[3] - 2*q[0]*q[2])*xo[XX] + (2*q[2]*q[3] + 2*q[0]*q[1])*xo[YY] + (q[0]*q[0]-q[1]*q[1]-q[2]*q[2]+q[3]*q[3])*xo[ZZ];
+
+		gsl_vector_set(x,XX,xX);
+		gsl_vector_set(x,YY,yY);
+		gsl_vector_set(x,ZZ,zZ);
+
+  		return 0;
+	}else{
+		return 1;
+	}
+}
+
+

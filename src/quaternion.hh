@@ -1,4 +1,4 @@
-/*	iofunc.hh	*/
+/*	cluster.hh	*/
 //C Copyright (C) 2015 Richard Tjörnhammar
 //L
 //L  This library is free software and is distributed under the terms
@@ -38,43 +38,32 @@
 //L  The GNU Lesser General Public can also be obtained by writing to the
 //L  Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
 //L  MA 02111-1307 USA
-#ifndef IOFUNC_H
-#define IOFUNC_H
 
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include "richtypes.h"
+#include "richfit.hh"
 
 namespace richanalysis {
 
-	class tensorIO {
-		public:
-		//! null constructor
-			inline tensorIO() {} //!< Null constructor	
-
-		//! Outputs a gsl matrix with label vector
-			void output_matrix_label(gmat *m, gvec *v);	
-
-		//! Outputs a gsl matrix with label vector
-			void output_matrix(gmat *M);
-
-		//! Outputs a gsl vector
-			void output_vector(gvec *v);
+  class quaternion
+  {
+  public:
+    //! constructor
+	inline	quaternion() { bSet_=0;  q_= gsl_vector_alloc(4); gsl_vector_set_zero(q_); } //!< Null constructor
+    //! 
+	int	is_complete(){	return bSet_; }
+	void	set_quat( const gvec *q0 ) { bSet_= q0->size==4?gsl_vector_memcpy( q_ , q0 )+1:0; }
+	gvec*	get_quat() { return q_; }
+	void	clear(void){ gsl_vector_set_zero(q_); bSet_=0; }
+    //! class destructor
+	~quaternion() {
+    		gsl_vector_free(q_);
 	};
 
-	class fileIO {
-		public:
-		//! I
-			particles read_xyz(std::string filename);
-		//! O
-			void output_geometry( particles px );
-			void output_geometry( particles px, std::string filename);
-			void output_geometry( particles px, std::string filename, std::string label);
-		//! SPECIAL FORMAT
-			void output_pdb( std::string filename, particles px, gvec *v);
-			void output_pdb( std::string filename, gmat *M	, gvec *v);
-	};
+    //! Routines for doing rotation
+	int	assign_quaterion( gvec *x, ftyp angle );
+	int	rotate_coord( gvec *x );
+  private:
+	int	bSet_;
+	gvec 	*q_;
+  };
 
 }
-#endif

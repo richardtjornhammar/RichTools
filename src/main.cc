@@ -41,6 +41,7 @@
 
 #include "richfit.hh"
 #include "iofunc.hh"
+#include "cluster.hh"
 
 int calc_distance_matrix(gmat *A, particles coord_space) {
 	int D = A->size1;
@@ -59,22 +60,6 @@ int calc_distance_matrix(gmat *A, particles coord_space) {
 	}else{
 		std::cout << "ERROR:: BAD CONTAINER LENGTHS:: calc_distance_matrix" << std::endl;
 		return 1;
-	}
-}
-
-
-int set_coordinate_matrix( gmat *A, particles coord_space) {
-	int D = A->size2;
-	if( A->size2 == coord_space.size()) {
-		for(int i=0;i<D; i++){
-			for(int j=XX;j<=ZZ;j++){
-				gsl_matrix_set( A, j, i, gsl_vector_get(coord_space[i].second,j)	);
-			}
-		}
-		return  0;
-	}else{
-		std::cout << "ERROR:: BAD CONTAINER LENGTHS:: calc_distance_matrix" << std::endl;
-		return -1;
 	}
 }
 
@@ -181,125 +166,32 @@ int main (int argc, char **argv) {
 			std::cout << "FATAL:: FAILED TO OPEN FILE" << std::endl;
 			return(1);
 	}
-	std::string ns=std::to_string(N);
+	std::string ns	= std::to_string(N);
 
 	int D		= coord_space.size();
 	int B		= carth_space.size();
-	std::cout << "INFO:: GOT DIMENSION1 :: " << D << std::endl;
-	std::cout << "INFO:: GOT DIMENSION2 :: " << B << std::endl;
 
-	gmat *CRD	= gsl_matrix_calloc( DIM, D );
-	gmat *CRT	= gsl_matrix_calloc( DIM, B );
-	gmat *CEN	= gsl_matrix_calloc( DIM, N );
-	gmat *CNT	= gsl_matrix_calloc( DIM, N );
+	richanalysis::cluster cl1, cl2;
 
-	gmat *C0T	= gsl_matrix_calloc( DIM, N );
-	gmat *C0N	= gsl_matrix_calloc( DIM, N );
+	cl1.alloc_space(D,N);
+	cl2.alloc_space(B,N);
 
-	set_coordinate_matrix( CRD, coord_space );
-	set_coordinate_matrix( CRT, carth_space );
+	cl1.set_matrix( coord_space );
+	cl2.set_matrix( carth_space );
 
-	gvec *w		= gsl_vector_alloc( D );
-	gvec *cw	= gsl_vector_alloc( B );
-	gvec *nw	= gsl_vector_alloc( N );
-	gvec *cn	= gsl_vector_alloc( N );
+	cl1.perform_clustering();
+	cl2.perform_clustering();
 
-	gvec *z		= gsl_vector_calloc( DIM );
+	richanalysis::node_indices nidx;
+	ftyp rmsd = nidx.find_index_relation(cl1,cl2);
+	std::vector<int> ndx = nidx.get_indices();
 
-	gsl_vector_set_all ( w  , 1.0 );
-	gsl_vector_set_all ( nw , 1.0 );
-	gsl_vector_set_all ( cw , 1.0 );
-	gsl_vector_set_all ( cn , 1.0 );
-
-	richanalysis::clustering	calg;
-	richanalysis::fitting		falg;
-	richanalysis::tensorIO		tIO;
-
-	calg.gsl_kmeans(CRD, w,CEN,nw);
-	calg.gsl_kmeans(CRT,cw,CNT,cn);
-
-	gsl_matrix_memcpy (C0T, CNT);
-	gsl_matrix_memcpy (C0N, CEN);
-
-	gmat *U		= gsl_matrix_calloc( DIM, DIM );
-	gvec *t		= gsl_vector_calloc( DIM );
-	gmat *iU	= gsl_matrix_calloc( DIM, DIM );
-	gvec *it	= gsl_vector_calloc( DIM );
-
-	std::cout << "::::INFO::::" << std::endl;
-	tIO.output_matrix(CEN);
-
-	ftyp min_rmsd=1.0E10;
-	int I=0,J=0;
-	std::vector<int> iv;
-	for(int i=0;i<N;i++)
-		iv.push_back(i);
-	gvec *gv = gsl_vector_calloc(DIM);	
-	std::vector<std::vector<int> > imv = calg.all_permutations(iv);
-	for(int j=0;j<imv.size();j++){
-		gsl_matrix_memcpy (CEN,C0N);
-		for(int i=0;i<iv.size();i++) {
-			gsl_matrix_get_col (gv, C0T, i);
-			gsl_matrix_set_col (CNT, imv[j][i], gv );
-		}
-		ftyp rmsd = falg.kabsch_fit(CEN,CNT,nw,U,t);
-		if(rmsd<min_rmsd){
-			J=j; 
-			min_rmsd=rmsd;
-		}
-	}
-	std::cout << "INFO:: " << J << " ";
-	for(int i=0;i<iv.size();i++)
-		std::cout << " " << imv[J][i];
+	std::cout << "INFO::HAVE:: \n ";
+	for(int i=0;i<ndx.size();i++)
+		std::cout << " " << ndx[i];
 	std::cout << std::endl;
 
-	std::cout << "INFO::labels in\n ";
-	for(int i=0;i<w->size;i++)
-		std::cout <<  " "  << (int)gsl_vector_get(w,i);
-	std::cout << std::endl;
+	std::cout << ":INFO:RMSD:"<< std::endl << rmsd << std::endl;	
 
-	std::cout << "INFO::are equivalent to\n ";
-	for(int i=0;i<cw->size;i++)
-		std::cout <<  " "  << imv[J][(int)gsl_vector_get(cw,i)];
-	std::cout << std::endl;
-
-
-
-	fIO.output_pdb("cd0n"+ns+".pdb", CEN, nw);
-	fIO.output_pdb("ct0n"+ns+".pdb", CNT, cn);
-
-	falg.invert_fit(U,t,iU,it);
-	falg.apply_fit(CNT,iU,it);	// for putting it back in the original pos
-
-	tIO.output_matrix(CNT);
-
-	std::cout << "::::INFO::::"<< min_rmsd << std::endl;	
-
-	if(verbose) {
-		std::cout << "INFO::HAVE CENTROIDS::" <<std::endl;
-		std::cout << "###########################"<<std::endl;
-		tIO.output_matrix_label(CEN,nw);
-		std::cout << "###########################"<<std::endl;
-		tIO.output_matrix_label(CRD,w);
-		std::cout << "###########################"<<std::endl;
-	}
-
-//	fIO.output_pdb("cld"+ns+".pdb", coord_space, w);
-
-	gsl_matrix_free(CRD);
-	gsl_matrix_free(CEN);
-	gsl_matrix_free(C0N);
-	gsl_vector_free(nw);
-	gsl_vector_free(w);
-	gsl_matrix_free(CRT);
-	gsl_matrix_free(CNT);
- 	gsl_matrix_free(C0T);
-	gsl_vector_free(cw);
-	gsl_vector_free(cn);
-	gsl_matrix_free(U);
-	gsl_vector_free(t);
-	gsl_matrix_free(iU);
-	gsl_vector_free(it);
-	gsl_vector_free(z);
 	return 0;
 }

@@ -1,4 +1,4 @@
-/*	iofunc.hh	*/
+/*	cluster.hh	*/
 //C Copyright (C) 2015 Richard Tjörnhammar
 //L
 //L  This library is free software and is distributed under the terms
@@ -38,43 +38,69 @@
 //L  The GNU Lesser General Public can also be obtained by writing to the
 //L  Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
 //L  MA 02111-1307 USA
-#ifndef IOFUNC_H
-#define IOFUNC_H
 
-#include <iostream>
-#include <fstream>
-#include <sstream>
 #include "richtypes.h"
+#include "simple.hh"
+#include "iofunc.hh"
+#include "richfit.hh"
 
 namespace richanalysis {
 
-	class tensorIO {
+	class clustering : public simple_ops {
 		public:
 		//! null constructor
-			inline tensorIO() {} //!< Null constructor	
+			inline clustering() {} //!< Null constructor
 
-		//! Outputs a gsl matrix with label vector
-			void output_matrix_label(gmat *m, gvec *v);	
-
-		//! Outputs a gsl matrix with label vector
-			void output_matrix(gmat *M);
-
-		//! Outputs a gsl vector
-			void output_vector(gvec *v);
+		//! performs k-means clustering on the specified data
+			int gsl_kmeans( gmat *, gvec *, gmat *, gvec * );
 	};
 
-	class fileIO {
+	class cluster : public clustering, public tensorIO {
 		public:
-		//! I
-			particles read_xyz(std::string filename);
-		//! O
-			void output_geometry( particles px );
-			void output_geometry( particles px, std::string filename);
-			void output_geometry( particles px, std::string filename, std::string label);
-		//! SPECIAL FORMAT
-			void output_pdb( std::string filename, particles px, gvec *v);
-			void output_pdb( std::string filename, gmat *M	, gvec *v);
+			cluster() { bSet_[0]=0; bSet_[1]=0; bSet_[2]=0; bSet_[3]=0; };
+			std::vector<int>	get_labels  ( void );
+			void			set_labels  ( std::vector<int> );
+			void			alloc_space ( int, int );
+			void			seM ( int, int, ftyp );
+			void			sev ( int, ftyp );
+			void			seC ( int, int, ftyp );
+			void			sew ( int, ftyp );
+			int 			set_matrix( particles coord_space ); 
+//	THIS IS BAD AND SHOULD BE CHANGED FOR LATER (BELOW 4)
+			void			print_all( void ) {
+							output_matrix( M_ );
+							output_vector(vc_ );
+							output_matrix( C_ );
+							output_vector(wc_ );
+						} ;
+			int			perform_clustering( void );
+			int			length_C(void){ return C_->size2; };
+			int			length_M(void){ return M_->size2; };
+			void	copyC(gmat *C0){ if(C0->size1==C_->size1&&C0->size2==C_->size2) { gsl_matrix_memcpy(C0, C_); } };
+			void	copyM(gmat *M0){ if(M0->size1==M_->size1&&M0->size2==M_->size2) { gsl_matrix_memcpy(M0, M_); } };
+			~cluster() {
+			//	if( bSet_[0] ) { gsl_matrix_free(M_) ; bSet_[0]=0;}
+			//	if( bSet_[1] ) { gsl_matrix_free(C_) ; bSet_[1]=0;}
+			//	if( bSet_[2] ) { gsl_vector_free(vc_); bSet_[2]=0;}
+			//	if( bSet_[3] ) { gsl_vector_free(wc_); bSet_[3]=0;}
+			}
+	private:
+		gmat	*M_; 		// 0 THE ORIGINAL COORDINATES 
+		gmat	*C_; 		// 1 THE CENTROIDS
+		gvec	*vc_;		// 0 UNSORTED LABELS
+		gvec	*wc_;		// 1 UNSORTED LABELS
+		int	bSet_[4];
+	};
+
+	class node_indices : public fitting {
+		public:
+			node_indices() {}
+			ftyp	find_index_relation( cluster c1, cluster c2 );
+			std::vector<int> get_indices(){ return idx_; };
+		private:
+			int bHaveRel_;
+			std::vector<int> idx_;
+			int N_,M_,I_,J_;
 	};
 
 }
-#endif

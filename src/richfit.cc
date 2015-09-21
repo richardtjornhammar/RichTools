@@ -40,129 +40,13 @@
 //L  MA 02111-1307 USA
 
 #include <iostream>
-//#include <fstream>
 #include <sstream>
-
 
 #include "richfit.hh"
 #include <math.h>
 #include <algorithm>
 
-namespace richanalysis {
-
-std::vector<std::vector<int> > 
-simple_ops::all_permutations(std::vector<int> v) {
-	std::vector<std::vector<int> > mv;
-	do { mv.push_back(v) ; } while (std::next_permutation(v.begin(), v.end()));
-	return mv;
-}
-
-void 
-tensorIO::output_vector(gvec *v){
-	std::cout <<"::INFO::VECTOR::";
-	for(int i=0;i<v->size;i++)
-		std::cout << " " << gsl_vector_get(v,i);
-	std::cout << std::endl;
-}
-
-void 
-tensorIO::output_matrix_label(gmat *M, gvec *v){
-	std::cout <<"::INFO::MATRIX::"<< std::endl;
-	for(int i=0;i<M->size2;i++){
-		if(M->size2==v->size)
-			std::cout << " " << gsl_vector_get(v,i);
-		for(int j=0;j<M->size1;j++)
-			std::cout << " " << gsl_matrix_get(M,j,i);
-		std::cout << std::endl;	
-	}
-	std::cout << std::endl;
-}
-
-void 
-tensorIO::output_matrix(gmat *M){
-	std::cout <<"::INFO::MATRIX::"<< std::endl;
-	for(int i=0;i<M->size2;i++){
-		for(int j=0;j<M->size1;j++)
-			std::cout << " " << gsl_matrix_get(M,j,i);
-		std::cout << std::endl;	
-	}
-	std::cout << std::endl;
-}
-
-int 
-clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw ){
-	int NN=dat->size2, MM=dat->size1, KK=cent->size2;
-
-	gvec *labels = gsl_vector_alloc(NN);
-	gvec *counts = gsl_vector_alloc(KK);
-	gmat *tmp_ce = gsl_matrix_alloc(MM,KK);
-
-	if( ((int)cent->size1)!=MM || !gsl_vector_isnonneg(w) || ((int)w->size)!=NN || ((int)nw->size)!=KK )	
-		return -1;
-	gsl_vector_set_zero(nw);
-
-	int h, i, j;
-	ftyp old_error, error = 1E30, TOL=1E-4; 
-
-	std::vector<int> myvector;
-	for (i=0; i<NN; ++i) myvector.push_back(i); 
-	random_shuffle ( myvector.begin(), myvector.end() );
-
-	i=0;
-	for ( h=0 ; h<KK ; h++ ){
-		for ( j=XX ; j<=ZZ ; j++ ){ 
-			gsl_matrix_set( cent, j, h , gsl_matrix_get( dat, j, myvector[h] ) );
-		} 
-	}
-	do {
-		old_error = error, error = 0; 
-		for (i = 0; i < KK; i++ ) {
-			gsl_vector_set(counts,i,0);
-			for (j = XX; j <= ZZ; j++){
-				gsl_matrix_set(tmp_ce,j,i,0.0);
-			}
- 		}
-		for (h = 0; h < NN; h++) {
-			ftyp min_distance = 1E30;
-			for (i = 0; i < KK; i++) {
-				ftyp distance = 0;
-				for ( j = XX; j<=ZZ ; j++ ) {
-					distance += square( gsl_matrix_get( dat,j,h ) - gsl_matrix_get( cent,j,i ) );
-				}
-				if (distance < min_distance) {
-	 				gsl_vector_set(labels,h,i); min_distance = distance; 
-				} 
-			} 
-			for ( j=XX ; j<=ZZ ; j++ ){
- 				gsl_matrix_set( tmp_ce, j, gsl_vector_get(labels,h),
-				 gsl_matrix_get( dat, j, h ) + gsl_matrix_get(tmp_ce, j, gsl_vector_get(labels,h)) );
-			}
-			gsl_vector_set(counts,gsl_vector_get(labels,h),1.0+gsl_vector_get(counts,gsl_vector_get(labels,h)));
-	 		error += min_distance; 
-		}
-	 	for (i = 0; i < KK; i++) {
-	 		for ( j=XX ; j<=ZZ ; j++ ) {
-				gsl_matrix_set(cent,j,i,
-				gsl_vector_get(counts,i)?(gsl_matrix_get(tmp_ce,j,i)/gsl_vector_get(counts,i)):(gsl_matrix_get(tmp_ce,j,i)));
-	 		}
-	 	}
-	} while ( fabs(error - old_error) > TOL );	// WHILE THEY ARE MOVING
-
-	ftyp wi=0.0, nwh=0.0;
-	for( i=0 ; i<NN ; i++) {
-		h 	= gsl_vector_get(labels,i);
-		wi	= gsl_vector_get(w,i);
-		nwh	= gsl_vector_get(nw,h);
-		gsl_vector_set(w,i,h);			// MIGHT NOT WANT TO OVERWRITE THIS
-		gsl_vector_set(nw,h,nwh+wi); 		// NOT NORMALIZED HERE
-	}
-
-	gsl_vector_free(labels); 
-	gsl_vector_free(counts);
-	gsl_matrix_free(tmp_ce);
-
-	return 0;
-}
+using namespace richanalysis;
 
 ftyp 
 linalg::v_sum(gvec *v) {
@@ -257,55 +141,7 @@ linalg::get_det(gmat *A) {
 
 	return det;
 }
-int	
-quaternion::assign_quaterion( gvec *v, ftyp angle ){
-// angle radians...
-	if(is_complete() && v->size==3 ){
-		ftyp norm,vx,vy,vz;
-		gvec xo;
-		vx=gsl_vector_get( v, XX );vy=gsl_vector_get( v, YY );vx=gsl_vector_get( v, ZZ );
-  		norm   = 1.0/sqrt(vx*vx+vy*vy+vz*vz);
 
-		gsl_vector_set ( q_ , XX ,  cos(angle*0.5) );
-		gsl_vector_set ( q_ , YY , vx * norm * sin(angle*0.5) );
-		gsl_vector_set ( q_ , ZZ , vy * norm * sin(angle*0.5) );
-		gsl_vector_set ( q_ ,DIM , vz * norm * sin(angle*0.5) );
-
-		return 0;
-	}else {
-		return 1;
-	}
-}
-
-int
-quaternion::rotate_coord( gvec *x ) 
-// x the vector that is rotated
-{
-	ftyp xX,yY,zZ;
-
-	if( is_complete() && x->size==DIM ){
-
-		ftyp q[DIM+1],xo[DIM];
-		q[XX] = gsl_vector_get(q_,XX); q[YY ] = gsl_vector_get(q_,YY );
-		q[ZZ] = gsl_vector_get(q_,ZZ); q[DIM] = gsl_vector_get(q_,DIM);
-
-		xo[XX] = gsl_vector_get(x, XX); 
-		xo[YY] = gsl_vector_get(x, YY); 
-		xo[ZZ] = gsl_vector_get(x, ZZ);
- 
-		xX = (q[0]*q[0]+q[1]*q[1]-q[2]*q[2]-q[3]*q[3])*xo[XX] + (2*q[1]*q[2] - 2*q[0]*q[3])*xo[YY] + (2*q[1]*q[3] + 2*q[0]*q[2])*xo[ZZ];
-		yY = (2*q[1]*q[2] + 2*q[0]*q[3])*xo[XX] + (q[0]*q[0]-q[1]*q[1] + q[2]*q[2]-q[3]*q[3])*xo[YY] + (2*q[2]*q[3]-2*q[0]*q[1])*xo[ZZ];
-		zZ = (2*q[1]*q[3] - 2*q[0]*q[2])*xo[XX] + (2*q[2]*q[3] + 2*q[0]*q[1])*xo[YY] + (q[0]*q[0]-q[1]*q[1]-q[2]*q[2]+q[3]*q[3])*xo[ZZ];
-
-		gsl_vector_set(x,XX,xX);
-		gsl_vector_set(x,YY,yY);
-		gsl_vector_set(x,ZZ,zZ);
-
-  		return 0;
-	}else{
-		return 1;
-	}
-}
 
 ftyp 
 fitting::shape_fit_tot(	gmat *P , gmat *Q ,	// IN
@@ -418,6 +254,77 @@ fitting::invert_fit( gmat *U, gvec *t, gmat *invU, gvec *invt ) {
 
 
 ftyp 
+fitting::kabsch_fit(	gsl_matrix *P, gsl_matrix *Q,			// IN
+			gsl_matrix *U, gsl_vector *t ) {		// OUT
+//// NOTE ON IO
+//	IN 	P(D,M), Q(D,N), w(M)	
+//	OUT	U(D,N), t(D), returns rmsd>0 or error<0
+	if( !(	   P->size1 == Q->size1 && P->size2 == Q->size2
+		&& U->size1 == U->size2 && U->size1 == P->size1 
+		&& t->size  == P->size1 ) )
+		return(-1.0); 				// PROBLEMS WITH THE DIMENSIONS
+	int L = ((int)P->size2), D = ((int)P->size1);	// STORED AS COLUMN MATRIX
+	int LL= ((int)Q->size2);			// L CANNOT BE LARGER THAN LL
+
+	gsl_vector *p0 = gsl_vector_alloc(D);
+	gsl_vector *q0 = gsl_vector_alloc(D);
+	gsl_vector *w  = gsl_vector_alloc(((int)P->size2));
+
+	double wsum=P->size2;
+	gsl_vector_set_all(w,1.0/wsum);
+
+	calc_centroid(P,w,p0); center_matrix(P,p0);
+	calc_centroid(Q,w,q0); center_matrix(Q,q0);
+
+	gsl_matrix *C	= gsl_matrix_alloc(D,D);
+	gsl_blas_dgemm(CblasNoTrans,CblasTrans, 1.0, P, Q, 0.0, C);
+
+	gsl_matrix *W	= gsl_matrix_alloc( D, D );
+	gsl_matrix *V	= gsl_matrix_alloc( D, D );
+	gsl_vector *S	= gsl_vector_alloc( D );
+	gsl_vector *work= gsl_vector_alloc( D );
+
+	gsl_linalg_SV_decomp( C, W, S, work );
+	gsl_matrix_memcpy( V, C );
+	
+	gsl_matrix *EYE = gsl_matrix_alloc( D, D );
+	gsl_matrix *TMP = gsl_matrix_alloc( D, D );
+	
+	gsl_matrix_set_identity( EYE );
+	
+	gsl_blas_dgemm(CblasNoTrans,CblasTrans, 1.0, V, W, 0.0, C);
+	double det = get_det(C);
+
+	if (det < 0){	// FLIP IT!
+		gsl_matrix_set(EYE,D-1,D-1,-1);
+		gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, W, 0.0, TMP);
+		gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, V, TMP, 0.0, C);
+	}
+	gsl_matrix_transpose_memcpy(U,C);
+
+	gsl_blas_dgemv(CblasNoTrans, -1.0, U, p0, 1.0, q0);
+	gsl_vector_memcpy(t,q0); 
+
+	gsl_matrix *DIFF = gsl_matrix_alloc( D, L );
+
+	double rmsd = 0.0;
+
+	gsl_matrix_memcpy( DIFF, Q );
+	gsl_blas_dgemm(CblasNoTrans,CblasNoTrans, 1.0, U, P, -1.0, DIFF);
+	for( int i=0 ; i<L ; i++ ){
+		rmsd += (  square(gsl_matrix_get(DIFF,XX,i))
+			 + square(gsl_matrix_get(DIFF,YY,i))
+			 + square(gsl_matrix_get(DIFF,ZZ,i)) );
+	}
+	rmsd/=wsum;
+
+	gsl_matrix_free(V); gsl_matrix_free(W); gsl_matrix_free(TMP); gsl_matrix_free(EYE); gsl_matrix_free(C);
+	gsl_vector_free(p0); gsl_vector_free(q0); gsl_vector_free(w); gsl_vector_free(S);gsl_vector_free(work);
+
+	return sqrt(rmsd);
+}
+
+ftyp 
 fitting::kabsch_fit(	gsl_matrix *P, gsl_matrix *Q, gsl_vector *w,	// IN
 			gsl_matrix *U, gsl_vector *t ) {		// OUT
 //// NOTE ON IO
@@ -482,6 +389,8 @@ fitting::kabsch_fit(	gsl_matrix *P, gsl_matrix *Q, gsl_vector *w,	// IN
 				 + square(gsl_matrix_get(DIFF,YY,i))
 				 + square(gsl_matrix_get(DIFF,ZZ,i)) );
 	}
+	gsl_matrix_free(V); gsl_matrix_free(W); gsl_matrix_free(TMP); gsl_matrix_free(EYE); gsl_matrix_free(C);
+	gsl_vector_free(p0);gsl_vector_free(q0); gsl_vector_free(S);gsl_vector_free(work);
 
 	return sqrt(rmsd);
 }
@@ -541,4 +450,4 @@ fitting::apply_fit( particles px, gmat *U, gvec *t) {
 	gsl_vector_free(res);
 }
 
-}
+
