@@ -184,7 +184,7 @@ int main (int argc, char **argv) {
 
 	richanalysis::node_indices nidx;
 	ftyp rmsd = nidx.find_relation(cl1,cl2);
-	std::cout << ":INFO:RMSD:"<< std::endl << rmsd << std::endl;	
+	std::cout << ":INFO:RMSD:" << std::endl << rmsd << std::endl;	
 
 	std::vector<int> rel_ndx = nidx.get_indices();
 	std::vector<int> den_ndx = cl1.get_labels();
@@ -202,7 +202,7 @@ int main (int argc, char **argv) {
 		nmod += rel_ndx[crd_ndx[i]]==icl?1:0;
 	}
 	particles align_space;
-	align_space = nidx.apply_rot_trans( carth_space , -1 );
+	align_space = nidx.apply_rot_trans( carth_space , 1 );
 	fIO.output_pdb("mod"+ns+".pdb", align_space, fio_ndx);
 
 //	HERE WE ALIGN FRAGMENTS
@@ -224,7 +224,7 @@ int main (int argc, char **argv) {
 		if( D<M || B<M )
 			M = ((int)(D<B)?(D):(B));
 
-		richanalysis::cluster clpx,cldx; 
+		richanalysis::cluster clpx, cldx; 
 		clpx.alloc_space(D,M);
 		cldx.alloc_space(B,M);
 		clpx.set_matrix( px );
@@ -233,9 +233,9 @@ int main (int argc, char **argv) {
 		clpx.perform_clustering();
 
 		richanalysis::node_indices cidx;
-		rmsd = cidx.find_relation(cldx,clpx);
+		rmsd = cidx.find_shape_trans(cldx,clpx);
 
-		rtx=cidx.apply_rot_trans( px , -1 );
+		rtx=cidx.apply_rot_trans( px , 1 );
 		pfrag=cf.app_par(rtx,pfrag);
 		for( int j=0;j<rtx.size(); j++ )
 			ord_ndx.push_back( ipart );

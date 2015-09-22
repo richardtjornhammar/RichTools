@@ -76,12 +76,7 @@ namespace richanalysis {
 			int			length_M(void){ return M_->size2; };
 			void	copyC(gmat *C0){ if(C0->size1==C_->size1&&C0->size2==C_->size2) { gsl_matrix_memcpy(C0, C_); } };
 			void	copyM(gmat *M0){ if(M0->size1==M_->size1&&M0->size2==M_->size2) { gsl_matrix_memcpy(M0, M_); } };
-			~cluster() {
-			//	if( bSet_[0] ) { gsl_matrix_free(M_) ; bSet_[0]=0;}
-			//	if( bSet_[1] ) { gsl_matrix_free(C_) ; bSet_[1]=0;}
-			//	if( bSet_[2] ) { gsl_vector_free(vc_); bSet_[2]=0;}
-			//	if( bSet_[3] ) { gsl_vector_free(wc_); bSet_[3]=0;}
-			}
+			~cluster() {}
 	private:
 		gmat	*M_; 		// 0 THE ORIGINAL COORDINATES 
 		gmat	*C_; 		// 1 THE CENTROIDS
@@ -90,18 +85,21 @@ namespace richanalysis {
 		int	bSet_[4];
 	};
 
-	class node_indices : public fitting , public tensorIO {
+	class node_indices : public fitting {
 		public:
 			node_indices() { bDirRel_=0; bUtSet_=0; 
 					U_  = gsl_matrix_calloc( DIM, DIM );  t_ = gsl_vector_calloc( DIM ); 
 					iU_ = gsl_matrix_calloc( DIM, DIM ); it_ = gsl_vector_calloc( DIM ); }
-			ftyp			find_relation( cluster c1, cluster c2 );
+			ftyp			find_centroid_relation( cluster c1, cluster c2 );
+			ftyp			find_shape_trans( cluster c1, cluster c2 );
+			ftyp			find_shape_relation( cluster c1, cluster c2 );
 			std::vector<int> 	get_indices(void){ return idx_; };
 			int			direction_relation(void){ return bDirRel_;};
 			int			have_transform(void){ return bUtSet_; };
 			particles 		apply_rot_trans( particles , int );
 			void			invert_transform(void);
 			void			printUt(void){output_matrix(U_);output_vector(t_);};
+			void			printiUt(void){output_matrix(iU_);output_vector(it_);};
 		private:
 			int bDirRel_;
 			std::vector<int> idx_;

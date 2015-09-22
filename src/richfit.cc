@@ -144,7 +144,7 @@ linalg::get_det(gmat *A) {
 
 
 ftyp 
-fitting::shape_fit_tot(	gmat *P , gmat *Q ,	// IN
+fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 			gvec *w1, gvec *w2, 	// IN
 			gmat *U , gvec *t ,	// OUT 
 			int II ) {	// CASE VARIABLE (DETERMINANT)
@@ -244,6 +244,140 @@ fitting::shape_fit_tot(	gmat *P , gmat *Q ,	// IN
 	return (0.0);
 }
 
+
+ftyp 
+fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
+			gmat *U , gvec *t 	) {	
+
+	if( !(	   P->size1 == Q->size1 
+		&& U->size1 == U->size2 && U->size1 == P->size1 
+		&& Q->size1 == U->size1 
+		&& t->size  == P->size1 && P->size1 <= P->size2 ) )
+		return(-1.0); 				// PROBLEMS WITH THE DIMENSIONS
+
+	int 	L = ((int)P->size2),
+		D = ((int)P->size1),
+		LL= ((int)Q->size2);			// MATRIX DIMS
+
+	ftyp wsum1 = P->size2;
+	ftyp wsum2 = Q->size2;
+	if( wsum1 <= 0.0 || wsum2 <= 0.0 ) {
+		return(-2.0); 				// PROBLEMS WITH VALUE
+	}
+
+	gsl_vector *w1 = gsl_vector_alloc((int)P->size2);
+	gsl_vector *w2 = gsl_vector_alloc((int)Q->size2);
+	gsl_vector_set_all( w1 , 1.0/wsum1 );
+	gsl_vector_set_all( w2 , 1.0/wsum2 );
+
+	gsl_vector *p0 = gsl_vector_alloc(D);
+	gsl_vector *q0 = gsl_vector_alloc(D);
+
+	calc_centroid(P,w1,p0); center_matrix(P,p0);
+	calc_centroid(Q,w2,q0); center_matrix(Q,q0);
+
+	gsl_matrix *w1P = gsl_matrix_alloc(P->size1,P->size2);
+	calc_vmprod( w1, P, w1P );
+	gsl_matrix *w2Q = gsl_matrix_alloc(Q->size1,Q->size2);
+	calc_vmprod( w2, Q, w2Q );
+
+	gsl_matrix *DIF = gsl_matrix_alloc( D, D );
+	gsl_matrix *sqP = gsl_matrix_alloc( D, D );
+	gsl_matrix *sqQ = gsl_matrix_alloc( D, D );
+
+	gsl_matrix *TMP = gsl_matrix_alloc( D, D );
+	gsl_matrix *C   = gsl_matrix_alloc( D, D );
+	gsl_matrix *V   = gsl_matrix_alloc( D, D );
+
+	gsl_matrix *EYE = gsl_matrix_alloc( D, D );
+
+//	THE P AND Q INPUTS ARE STORED IN DxN MATRIX NOT NxD
+	gsl_blas_dgemm(CblasNoTrans,CblasTrans, 1.0, w1P, w1P, 0.0, C);
+	gsl_matrix_memcpy( sqP, C );
+
+////	THIS IS WHERE THE DECOMPOSITION OCCURS
+	gsl_matrix *U1	= gsl_matrix_alloc( D, D );
+	gsl_matrix *V1	= gsl_matrix_alloc( D, D );
+	gsl_vector *S1	= gsl_vector_alloc( D );
+	gsl_vector *wrk1= gsl_vector_alloc( D );
+
+	gsl_linalg_SV_decomp ( C, V1, S1, wrk1 );
+	gsl_matrix_memcpy( U1, C );	// HAVE ROTATION
+
+	gsl_blas_dgemm(CblasNoTrans,CblasTrans, 1.0, w2Q, w2Q, 0.0, C);
+	gsl_matrix_memcpy( sqQ, C );
+
+//	AND THE SECOND SET
+	gsl_matrix *U2	= gsl_matrix_alloc( D, D );
+	gsl_matrix *V2	= gsl_matrix_alloc( D, D );
+	gsl_vector *S2	= gsl_vector_alloc( D );
+	gsl_vector *wrk2= gsl_vector_alloc( D );
+
+	gsl_linalg_SV_decomp ( C, V2, S2, wrk2 );
+	gsl_matrix_memcpy( U2, C );	// HAVE ROTATION
+
+////	ROTATION	FOR THE MODEL (Q)
+//	TAKE NOTE OF THE RESULTING SIGN ON U
+	ftyp rmsd=0.0, min_rmsd=1e10;
+	gsl_matrix *Ut = gsl_matrix_calloc( D, D );
+	gsl_vector *tt = gsl_vector_calloc( D );
+	gsl_matrix_memcpy( Ut , U );
+	ftyp cnt=(ftyp)DIM;
+
+	gsl_blas_dgemm(CblasNoTrans,CblasTrans, 1.0, V1, V2, 0.0, C);
+	ftyp det = get_det(C);
+	int JJ=(det<0)?4:0;
+	for(int II=JJ;II<(JJ+4);II++){
+		gsl_vector_memcpy(tt, p0);
+		gsl_matrix_set_identity( EYE );
+		switch(II){
+			case  0: break;
+			case  1: gsl_matrix_set  ( EYE,  0,  0, -1.0 ); gsl_matrix_set( EYE,  1,  1, -1.0 ); break;
+			case  2: gsl_matrix_set  ( EYE,  0,  0, -1.0 ); gsl_matrix_set( EYE,  1,  1, -1.0 ); break;
+			case  3: gsl_matrix_set  ( EYE,  2,  2, -1.0 ); gsl_matrix_set( EYE,  2,  2, -1.0 ); break;
+			case  4: gsl_matrix_set  ( EYE,  0,  0, -1.0 ); break;
+			case  5: gsl_matrix_set  ( EYE,  2,  2, -1.0 ); break;
+			case  6: gsl_matrix_scale( EYE, -1.0); break;
+			case  7: gsl_matrix_set  ( EYE,  1,  1, -1.0 ); break;
+			default: break;
+		}
+		gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, V2, 0.0, TMP ); // CblasNoTrans, CblasTrans
+		gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, V1, TMP, 0.0, C ); // CblasNoTrans, CblasNoTrans	
+		gsl_matrix_memcpy( Ut , C );
+		gsl_blas_dgemv( CblasNoTrans, -1.0, Ut, q0, 1.0, tt );
+
+		gsl_matrix_memcpy( DIF, sqQ );
+		gsl_blas_dgemm(CblasNoTrans,CblasNoTrans, 1.0, Ut, sqP, -1.0, DIF);
+	
+		rmsd=0.0;
+		for( int i=0 ; i<DIM ; i++ ){
+			rmsd += (  square(gsl_matrix_get(DIF,XX,i))
+				 + square(gsl_matrix_get(DIF,YY,i))
+				 + square(gsl_matrix_get(DIF,ZZ,i)) );
+		}
+		rmsd /= cnt;
+		if(rmsd<min_rmsd){
+			gsl_matrix_memcpy( U , Ut );
+			gsl_vector_memcpy( t , tt );
+			min_rmsd=rmsd;
+			//std::cout <<"INFO::" << II << std::endl;
+		}
+	}
+	gsl_matrix_free(EYE);	gsl_matrix_free(sqP);
+	gsl_matrix_free(TMP);	gsl_matrix_free(sqQ);
+	gsl_matrix_free( C );	gsl_matrix_free(DIF);
+	gsl_matrix_free( V );
+	gsl_matrix_free(w1P);	gsl_matrix_free(w2Q);
+	gsl_matrix_free(U1);	gsl_matrix_free(U2);
+	gsl_matrix_free(V1);	gsl_matrix_free(V2);
+	gsl_vector_free(S1);	gsl_vector_free(S2);
+	gsl_vector_free(wrk1);	gsl_vector_free(wrk2);
+	gsl_vector_free(p0);	gsl_vector_free(w1);
+	gsl_vector_free(q0);	gsl_vector_free(w2);
+
+	return sqrt(min_rmsd);
+}
+
 void
 fitting::invert_fit( gmat *U, gvec *t, gmat *invU, gvec *invt ) {
 	if( invU->size1!=U->size1 || invU->size2!=U->size2 || t->size!=invt->size)
@@ -308,7 +442,6 @@ fitting::kabsch_fit(	gsl_matrix *P, gsl_matrix *Q,			// IN
 	gsl_matrix *DIFF = gsl_matrix_alloc( D, L );
 
 	double rmsd = 0.0;
-
 	gsl_matrix_memcpy( DIFF, Q );
 	gsl_blas_dgemm(CblasNoTrans,CblasNoTrans, 1.0, U, P, -1.0, DIFF);
 	for( int i=0 ; i<L ; i++ ){

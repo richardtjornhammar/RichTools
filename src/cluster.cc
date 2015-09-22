@@ -215,7 +215,7 @@ node_indices::invert_transform( void ){
 }
 
 ftyp
-node_indices::find_relation(cluster c1, cluster c2){
+node_indices::find_centroid_relation(cluster c1, cluster c2){
 	ftyp min_rmsd	= 1.0E10;
 
 	int N = c1.length_C();
@@ -251,12 +251,13 @@ node_indices::find_relation(cluster c1, cluster c2){
 			gsl_matrix_get_col (gv, C0T, i);
 			gsl_matrix_set_col (CNT, imv[j][i], gv );
 		}
-		ftyp rmsd = kabsch_fit(CEN,CNT,U,t);
+		ftyp rmsd = kabsch_fit(CNT,CEN,U,t);
 		if(rmsd<min_rmsd){
 			J=j; 
 			min_rmsd=rmsd;	
 			gsl_matrix_memcpy (Ut, U);
 			gsl_vector_memcpy (tt, t);
+
 		}
 	}
 
@@ -265,7 +266,7 @@ node_indices::find_relation(cluster c1, cluster c2){
 
 	bDirRel_=2*(c1.length_M()>c2.length_M())-1;
 
-	if(!have_transform()){
+	if( !have_transform() ){
 		gsl_matrix_memcpy (U_, Ut);
 		gsl_vector_memcpy (t_, tt);
 		invert_transform();
@@ -278,6 +279,82 @@ node_indices::find_relation(cluster c1, cluster c2){
 	gsl_matrix_free(U);
 	gsl_vector_free(t);
 	gsl_vector_free(gv);
+
+	return min_rmsd;
+}
+
+ftyp
+node_indices::find_shape_relation( cluster c1, cluster c2 ){
+// for all coordinates belonging to
+// each centroid in c1 check each set in c2
+// number of centroids must be the same in each class
+// return the best shape match
+	ftyp min_rmsd	= 1.0E10;
+
+	int N = c1.length_C();
+
+	if(N != c2.length_C())
+		std::cout <<"ERROR IN IDX REL"<<std::endl;
+
+	gmat *U		= gsl_matrix_calloc( DIM, DIM );
+	gvec *t		= gsl_vector_calloc( DIM );
+
+	int J		= 0;
+
+	gmat *C0T	= gsl_matrix_calloc( DIM, N );
+	gmat *C0N	= gsl_matrix_calloc( DIM, N );
+	gmat *CNT	= gsl_matrix_calloc( DIM, N );
+	gmat *CEN	= gsl_matrix_calloc( DIM, N );
+	gvec *gv 	= gsl_vector_calloc( DIM );
+
+	c1.copyC(C0N);
+	c2.copyC(C0T);
+
+	gmat *Ut = gsl_matrix_calloc( DIM, DIM );
+	gvec *tt = gsl_vector_calloc( DIM );
+
+	std::vector<int> iv;
+	for( int i=0 ; i<N ; i++ )
+		iv.push_back(i);
+	std::vector<std::vector<int> > imv = all_permutations(iv);
+	for( int j=0 ; j<imv.size() ; j++ ) { 
+		// do all the shape fits
+		for(int i=0;i<iv.size();i++) {
+			// load all our coordinates into gmats
+			// i in c1 :: imv[j][i] in c2
+		}
+	}
+}
+
+ftyp
+node_indices::find_shape_trans( cluster c1, cluster c2 ){
+//	Do a single shape fit
+
+	int N = c1.length_M();
+	gmat *MEN	= gsl_matrix_calloc( DIM, N );
+	c1.copyM(MEN);
+
+	int M = c2.length_M();
+	gmat *MNT	= gsl_matrix_calloc( DIM, M );
+	c2.copyM(MNT);
+
+	gmat *U		= gsl_matrix_calloc( DIM, DIM );
+	gvec *t		= gsl_vector_calloc( DIM );
+
+	ftyp min_rmsd = shape_fit(MNT,MEN,U,t);
+
+	if( !have_transform() ){
+		gsl_matrix_memcpy (U_, U);
+		gsl_vector_memcpy (t_, t);
+		invert_transform();
+		bUtSet_=1;
+	}
+
+	gsl_matrix_free(MNT);
+	gsl_matrix_free(MEN);
+
+	gsl_matrix_free(U); 
+	gsl_vector_free(t);
 
 	return min_rmsd;
 }
