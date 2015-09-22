@@ -393,7 +393,7 @@ fitting::kabsch_fit(	gsl_matrix *P, gsl_matrix *Q, gsl_vector *w,	// IN
 	gsl_vector_free(p0);gsl_vector_free(q0); gsl_vector_free(S);gsl_vector_free(work);
 
 	return sqrt(rmsd);
-}
+}	
 
 void 
 fitting::apply_fit( gmat *M, gmat *U, gvec *t) {

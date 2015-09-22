@@ -90,21 +90,25 @@ namespace richanalysis {
 		int	bSet_[4];
 	};
 
-	class node_indices : public fitting {
+	class node_indices : public fitting , public tensorIO {
 		public:
-			node_indices() { bDirRel_=0;bUtSet_=0; U_ = gsl_matrix_calloc( DIM, DIM ); t_ = gsl_vector_calloc( DIM ); }
-			ftyp			find_index_relation( cluster c1, cluster c2 );
+			node_indices() { bDirRel_=0; bUtSet_=0; 
+					U_  = gsl_matrix_calloc( DIM, DIM );  t_ = gsl_vector_calloc( DIM ); 
+					iU_ = gsl_matrix_calloc( DIM, DIM ); it_ = gsl_vector_calloc( DIM ); }
+			ftyp			find_relation( cluster c1, cluster c2 );
 			std::vector<int> 	get_indices(void){ return idx_; };
 			int			direction_relation(void){ return bDirRel_;};
 			int			have_transform(void){ return bUtSet_; };
-			particles 		apply_rotation_translation( particles px );
+			particles 		apply_rot_trans( particles , int );
+			void			invert_transform(void);
+			void			printUt(void){output_matrix(U_);output_vector(t_);};
 		private:
 			int bDirRel_;
 			std::vector<int> idx_;
 			int N_,M_,I_,J_;
 			int bUtSet_;
-			gmat *U_;
-			gvec *t_;
+			gmat *U_,*iU_;
+			gvec *t_,*it_;
 	};
 
 }

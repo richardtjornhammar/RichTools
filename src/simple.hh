@@ -41,11 +41,21 @@
 #ifndef SIMPLE_H
 #define SIMPLE_H
 namespace richanalysis {
+
 	class simple_ops {
 		public:
 			ftyp square( ftyp x ) { return x*x; }
 			ftyp abs( ftyp x ) { return (x>0)?(x):(-1*x); }
 			std::vector<std::vector<int> > all_permutations(std::vector<int> v);
+	};
+
+	class coord_format {
+		public:
+			void		mat2par( gmat*, gvec*, particles );
+			// SHOULD IMPLEMENT ONE WICH RETURNS VECTOR OF PARTICLES ORDERED ON NDX (BELOW)
+			particles	par2par( particles, std::vector<int> , int );
+			gmat		par2mat( particles );
+			particles	app_par( particles , particles );
 	};
 }
 #endif

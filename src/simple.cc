@@ -41,6 +41,7 @@
 
 #include "richtypes.h"
 #include "simple.hh"
+#include <iostream>
 #include <algorithm>
 
 using namespace richanalysis;
@@ -52,3 +53,39 @@ simple_ops::all_permutations(std::vector<int> v) {
 	return mv;
 }
 
+void
+coord_format::mat2par( gmat* M, gvec* w, particles px ) {
+	if( M->size1==DIM && M->size2==px.size() ){
+		gsl_vector *v = gsl_vector_calloc(DIM);
+		for(int i=0;i<M->size2;i++){
+			gsl_matrix_get_col ( v, M, i);
+			gsl_vector_memcpy(px[i].second,v);
+			px[i].first = std::to_string(gsl_vector_get(w,i));
+		}
+	}else{
+		std::cout << "ERROR::MAT2PAR" << std::endl;
+	}
+}
+
+particles
+coord_format::par2par( particles ipx, std::vector<int> ndx, int I ) {
+	particles opx;
+	if(ipx.size()==ndx.size()){
+		for(int i=0;i<ipx.size();i++){
+			if(ndx[i]==I){
+				opx.push_back(ipx[i]);
+			}
+		}
+		return opx;
+	}else{
+		std::cout << "ERROR::PAR2PAR" << std::endl;
+	}
+}
+
+particles
+coord_format::app_par( particles ipx, particles opx ) {
+	for(int i=0;i<ipx.size();i++){
+		opx.push_back(ipx[i]);
+	}
+	return opx;
+}

@@ -196,37 +196,26 @@ clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw ){
 }
 
 particles 
-node_indices::apply_rotation_translation( particles px ){
+node_indices::apply_rot_trans( particles px , int I){
 	if(bUtSet_){
-		gsl_vector *pos = gsl_vector_alloc( DIM );
-		gsl_vector *res = gsl_vector_alloc( DIM );
-		gsl_vector *xv  = gsl_vector_alloc( DIM );
-		gsl_vector *tmp = gsl_vector_alloc( DIM );
-		gsl_matrix *Utm = gsl_matrix_alloc( DIM ,DIM );		
-
-		int L = ((int)px.size());
-		gsl_vector_memcpy(tmp,t_);	
-		gsl_matrix_memcpy(Utm,U_);
-
-		tensorIO tIO;
-		tIO.output_matrix(Utm);
-	
-		for( int i=0 ; i<L ; i++ ){
-			gsl_vector_memcpy(xv,px[i].second);	
-			gsl_blas_dgemv(CblasNoTrans, 1.0, Utm, xv, 0.0, res);
-			gsl_vector_add(res,tmp);
-			gsl_vector_add(xv,res);
-			gsl_vector_memcpy(px[i].second,xv);
-		}
-
-		gsl_vector_free(xv); gsl_vector_free(tmp); gsl_vector_free(res); gsl_vector_free(pos);
-		gsl_matrix_free(Utm);
+		if(I>=0)
+			apply_fit( px, U_, t_	);
+		if(I<0 )
+			apply_fit( px, iU_, it_	);
 	}
 	return px;
 }
 
+void
+node_indices::invert_transform( void ){
+	if( iU_->size1==U_->size1 && iU_->size2==U_->size2 && t_->size==it_->size){
+		invert_matrix(U_,iU_);
+		gsl_blas_dgemv(CblasNoTrans, -1.0, iU_, t_, 0.0, it_);
+	}
+}
+
 ftyp
-node_indices::find_index_relation(cluster c1, cluster c2){
+node_indices::find_relation(cluster c1, cluster c2){
 	ftyp min_rmsd	= 1.0E10;
 
 	int N = c1.length_C();
@@ -279,6 +268,7 @@ node_indices::find_index_relation(cluster c1, cluster c2){
 	if(!have_transform()){
 		gsl_matrix_memcpy (U_, Ut);
 		gsl_vector_memcpy (t_, tt);
+		invert_transform();
 		bUtSet_=1;
 	}
 

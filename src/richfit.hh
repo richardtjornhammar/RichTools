@@ -63,10 +63,10 @@ namespace richanalysis {
 			inline	fitting() {} //!< Null constructor
 
 		//! shape fitting
-			ftyp	shape_fit_tot	( gmat *P , gmat *Q ,	// IN
-					  	gvec *w1, gvec *w2, 	// IN
-					  	gmat *U , gvec *t ,	// OUT 
-					  	int II );
+			ftyp	shape_fit_tot	(	gmat *P , gmat *Q ,	// IN
+					  		gvec *w1, gvec *w2, 	// IN
+					  		gmat *U , gvec *t ,	// OUT 
+					  		int II );
 		//! model alignment
 			ftyp	kabsch_fit	(	gmat *P	, gmat *Q ,		// IN
 				  		 	gmat *U	, gvec *t );		// OUT

@@ -183,7 +183,7 @@ int main (int argc, char **argv) {
 	cl2.perform_clustering();
 
 	richanalysis::node_indices nidx;
-	ftyp rmsd = nidx.find_index_relation(cl1,cl2);
+	ftyp rmsd = nidx.find_relation(cl1,cl2);
 	std::cout << ":INFO:RMSD:"<< std::endl << rmsd << std::endl;	
 
 	std::vector<int> rel_ndx = nidx.get_indices();
@@ -192,28 +192,58 @@ int main (int argc, char **argv) {
 	std::vector<int> fio_ndx;
 
 	int icl=1;
-	int nden=0,nmod=0;
+	int nden=0, nmod=0;
 
-	std::cout << "INFO::HAVE::REL " << nidx.direction_relation() << "> \n" ;
-	for(int i=0;i<rel_ndx.size();i++)
-		std::cout << " " << rel_ndx[i];
-
-	std::cout << std::endl;
-	std::cout << "INFO::HAVE::DEN \n ";
 	for(int i=0; i<den_ndx.size(); i++) {
 		nden += den_ndx[i]==icl?1:0;
 	}
-	std::cout << std::endl;
-	std::cout << "INFO::HAVE::CRD \n ";
 	for(int i=0; i<crd_ndx.size(); i++) {
 		fio_ndx.push_back( rel_ndx[crd_ndx[i]] );
 		nmod += rel_ndx[crd_ndx[i]]==icl?1:0;
 	}
-	std::cout << std::endl;
-	std::cout <<"INFO::" << nden << ", " << nmod << std::endl;
+	particles align_space;
+	align_space = nidx.apply_rot_trans( carth_space , -1 );
+	fIO.output_pdb("mod"+ns+".pdb", align_space, fio_ndx);
 
-	fIO.output_pdb("cld"+ns+".pdb", coord_space, den_ndx);
-	fIO.output_pdb("clm"+ns+".pdb", carth_space, fio_ndx);
+//	HERE WE ALIGN FRAGMENTS
+	particles pfrag;
+	std::vector<int> ord_ndx;
+	int M=N;
+	for( int ipart=0;ipart<N;ipart++){
+		particles px,dx,rtx;
+		richanalysis::coord_format cf;
+
+		px=cf.par2par(carth_space, fio_ndx, ipart);
+		dx=cf.par2par(coord_space, den_ndx, ipart);
+
+		//std::string ips	= std::to_string(ipart);
+		//fIO.output_pdb("dx"+ips+".pdb", dx);
+
+		D	= px.size();
+		B	= dx.size();
+		if( D<M || B<M )
+			M = ((int)(D<B)?(D):(B));
+
+		richanalysis::cluster clpx,cldx; 
+		clpx.alloc_space(D,M);
+		cldx.alloc_space(B,M);
+		clpx.set_matrix( px );
+		cldx.set_matrix( dx );
+		cldx.perform_clustering();	
+		clpx.perform_clustering();
+
+		richanalysis::node_indices cidx;
+		rmsd = cidx.find_relation(cldx,clpx);
+
+		rtx=cidx.apply_rot_trans( px , -1 );
+		pfrag=cf.app_par(rtx,pfrag);
+		for( int j=0;j<rtx.size(); j++ )
+			ord_ndx.push_back( ipart );
+	}
+	fIO.output_pdb("frag"+ns+".pdb", pfrag , ord_ndx );
+
+//	THIS IS THE DENSITY WE ARE FITTING TO
+	fIO.output_pdb("dens"+ns+".pdb", coord_space , den_ndx);
 
 	return 0;
 }
