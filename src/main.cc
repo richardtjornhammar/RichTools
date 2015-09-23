@@ -171,15 +171,25 @@ int main (int argc, char **argv) {
 	int D		= coord_space.size();
 	int B		= carth_space.size();
 
-	richanalysis::cluster cl1, cl2;
+	richanalysis::cluster cl1, cl2, cl_test;
 
-	cl1.alloc_space(D,N);
+	cl1.alloc_space(D,N); 
 	cl2.alloc_space(B,N);
 
-	cl1.set_matrix( coord_space );
+	cl1.set_matrix( coord_space ); 	
 	cl2.set_matrix( carth_space );
 
-	cl1.perform_clustering();
+	cl_test.alloc_space(D,B); 
+	cl_test.set_matrix( coord_space );
+	cl_test.perform_clustering(0.0);
+	gmat *Mtest = gsl_matrix_alloc(DIM,B);
+	gvec *vtest = gsl_vector_alloc(B);
+	cl_test.copyC(Mtest);
+	cl_test.copyw(vtest);
+	richanalysis::fileIO fio;
+	fio.output_pdb("cltest.pdb", Mtest, vtest);
+
+	cl1.perform_clustering(); 
 	cl2.perform_clustering();
 
 	int isw = 1;
@@ -228,8 +238,8 @@ int main (int argc, char **argv) {
 			M = ((int)(D<B)?(D):(B));
 
 		richanalysis::cluster clpx, cldx; 
-		clpx.alloc_space(D,M);
-		cldx.alloc_space(B,M);
+		clpx.alloc_space( D, M );
+		cldx.alloc_space( B, M );
 		clpx.set_matrix( px );
 		cldx.set_matrix( dx );
 		cldx.perform_clustering();	

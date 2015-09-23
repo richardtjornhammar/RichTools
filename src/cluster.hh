@@ -53,6 +53,7 @@ namespace richanalysis {
 
 		//! performs k-means clustering on the specified data
 			int gsl_kmeans( gmat *, gvec *, gmat *, gvec * );
+			int gsl_kmeans( gmat *, gvec *, gmat *, gvec *, ftyp );
 	};
 
 	class cluster : public clustering, public tensorIO {
@@ -72,6 +73,7 @@ namespace richanalysis {
 							output_vector(wc_ );
 						} ;
 			int			perform_clustering( void );
+			int			perform_clustering( ftyp );
 			int			length_C(void){ return C_->size2; };
 			int			length_M(void){ return M_->size2; };
 			void	copyC(gmat *C0){ if(C0->size1==C_->size1&&C0->size2==C_->size2) { gsl_matrix_memcpy(C0, C_); } };

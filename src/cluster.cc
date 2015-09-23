@@ -81,6 +81,23 @@ cluster::perform_clustering ( void ){
 	}
 }
 
+int
+cluster::perform_clustering ( ftyp cutoff ){
+	if( bSet_[0] && bSet_[1] && bSet_[2] && bSet_[3] ) {
+		gsl_kmeans(M_, vc_, C_, wc_, cutoff);
+		int N=wc_->size;
+		int M=vc_->size;
+		NperC_.clear();
+		for(int i=0;i<N;i++){
+			int numi=0;
+			for( int j=0 ; j<vc_->size ; j++ ) {
+				numi+=(gsl_vector_get(vc_,j)==i)?1:0;
+			}
+			NperC_.push_back(numi);
+		}
+	}
+}
+
 void
 cluster::seM ( int i , int j , ftyp val){
 	if(i<M_->size1&&j<M_->size2&&i>=0&&j>=0)
@@ -172,6 +189,82 @@ clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw ){
 					distance += square( gsl_matrix_get( dat,j,h ) - gsl_matrix_get( cent,j,i ) );
 				}
 				if (distance < min_distance) {
+	 				gsl_vector_set(labels,h,i); min_distance = distance; 
+				} 
+			} 
+			for ( j=XX ; j<=ZZ ; j++ ){
+ 				gsl_matrix_set( tmp_ce, j, gsl_vector_get(labels,h),
+				 gsl_matrix_get( dat, j, h ) + gsl_matrix_get(tmp_ce, j, gsl_vector_get(labels,h)) );
+			}
+			gsl_vector_set(counts,gsl_vector_get(labels,h),1.0+gsl_vector_get(counts,gsl_vector_get(labels,h)));
+	 		error += min_distance; 
+		}
+	 	for (i = 0; i < KK; i++) {
+	 		for ( j=XX ; j<=ZZ ; j++ ) {
+				gsl_matrix_set(cent,j,i,
+				gsl_vector_get(counts,i)?(gsl_matrix_get(tmp_ce,j,i)/gsl_vector_get(counts,i)):(gsl_matrix_get(tmp_ce,j,i)));
+	 		}
+	 	}
+	} while ( fabs(error - old_error) > TOL );	// WHILE THEY ARE MOVING
+
+	ftyp wi=0.0, nwh=0.0;
+	for( i=0 ; i<NN ; i++) {
+		h 	= gsl_vector_get(labels,i);
+		wi	= gsl_vector_get(w,i);
+		nwh	= gsl_vector_get(nw,h);
+		gsl_vector_set(w,i,h);			// MIGHT NOT WANT TO OVERWRITE THIS
+		gsl_vector_set(nw,h,nwh+wi); 		// NOT NORMALIZED HERE
+	}
+
+	gsl_vector_free(labels); 
+	gsl_vector_free(counts);
+	gsl_matrix_free(tmp_ce);
+
+	return 0;
+}
+
+
+int 
+clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw, ftyp cutoff){
+	int NN=dat->size2, MM=dat->size1, KK=cent->size2;
+
+	gvec *labels = gsl_vector_alloc(NN);
+	gvec *counts = gsl_vector_alloc(KK);
+	gmat *tmp_ce = gsl_matrix_alloc(MM,KK);
+
+	if( ((int)cent->size1)!=MM || !gsl_vector_isnonneg(w) || ((int)w->size)!=NN || ((int)nw->size)!=KK )	
+		return -1;
+	gsl_vector_set_zero(nw);
+
+	int h, i, j;
+	ftyp old_error, error = 1E30, TOL=1E-4; 
+
+	std::vector<int> myvector;
+	for (i=0; i<NN; ++i) myvector.push_back(i); 
+	random_shuffle ( myvector.begin(), myvector.end() );
+
+	i=0;
+	for ( h=0 ; h<KK ; h++ ){
+		for ( j=XX ; j<=ZZ ; j++ ){ 
+			gsl_matrix_set( cent, j, h , gsl_matrix_get( dat, j, myvector[h] ) );
+		} 
+	}
+	do {
+		old_error = error, error = 0; 
+		for (i = 0; i < KK; i++ ) {
+			gsl_vector_set(counts,i,0);
+			for (j = XX; j <= ZZ; j++){
+				gsl_matrix_set(tmp_ce,j,i,0.0);
+			}
+ 		}
+		for (h = 0; h < NN; h++) {
+			ftyp min_distance = 1E30;
+			for (i = 0; i < KK; i++) {
+				ftyp distance = 0;
+				for ( j = XX; j<=ZZ ; j++ ) {
+					distance += square( gsl_matrix_get( dat,j,h ) - gsl_matrix_get( cent,j,i ) );
+				}
+				if (distance < min_distance  && distance > square(cutoff) ) { // 
 	 				gsl_vector_set(labels,h,i); min_distance = distance; 
 				} 
 			} 
