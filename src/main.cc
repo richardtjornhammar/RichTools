@@ -182,8 +182,14 @@ int main (int argc, char **argv) {
 	cl1.perform_clustering();
 	cl2.perform_clustering();
 
+	int isw = 1;
+
 	richanalysis::node_indices nidx;
-	ftyp rmsd = nidx.find_relation(cl1,cl2);
+
+	ftyp rmsd = 0.0;
+
+	rmsd = nidx.find_centroid_relation(cl1,cl2);
+
 	std::cout << ":INFO:RMSD:" << std::endl << rmsd << std::endl;	
 
 	std::vector<int> rel_ndx = nidx.get_indices();
@@ -202,7 +208,7 @@ int main (int argc, char **argv) {
 		nmod += rel_ndx[crd_ndx[i]]==icl?1:0;
 	}
 	particles align_space;
-	align_space = nidx.apply_rot_trans( carth_space , 1 );
+	align_space = nidx.apply_rot_trans( carth_space );
 	fIO.output_pdb("mod"+ns+".pdb", align_space, fio_ndx);
 
 //	HERE WE ALIGN FRAGMENTS
@@ -215,9 +221,6 @@ int main (int argc, char **argv) {
 
 		px=cf.par2par(carth_space, fio_ndx, ipart);
 		dx=cf.par2par(coord_space, den_ndx, ipart);
-
-		//std::string ips	= std::to_string(ipart);
-		//fIO.output_pdb("dx"+ips+".pdb", dx);
 
 		D	= px.size();
 		B	= dx.size();
@@ -233,9 +236,13 @@ int main (int argc, char **argv) {
 		clpx.perform_clustering();
 
 		richanalysis::node_indices cidx;
-		rmsd = cidx.find_shape_trans(cldx,clpx);
 
-		rtx=cidx.apply_rot_trans( px , 1 );
+		if(isw) //WE ARE ALREADY IN CORRECT CENTROID SO JUST SHAPEFIT
+			rmsd = cidx.find_shape_trans(cldx,clpx);
+		else
+			rmsd = cidx.find_centroid_relation(cldx,clpx);
+
+		rtx=cidx.apply_rot_trans( px );
 		pfrag=cf.app_par(rtx,pfrag);
 		for( int j=0;j<rtx.size(); j++ )
 			ord_ndx.push_back( ipart );

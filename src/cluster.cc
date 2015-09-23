@@ -66,8 +66,19 @@ cluster::alloc_space( int D1, int D2 ) {
 
 int
 cluster::perform_clustering ( void ){
-	if( bSet_[0] && bSet_[1] && bSet_[2] && bSet_[3] )
-		return gsl_kmeans(M_, vc_, C_, wc_);
+	if( bSet_[0] && bSet_[1] && bSet_[2] && bSet_[3] ) {
+		gsl_kmeans(M_, vc_, C_, wc_);
+		int N=wc_->size;
+		int M=vc_->size;
+		NperC_.clear();
+		for(int i=0;i<N;i++){
+			int numi=0;
+			for( int j=0 ; j<vc_->size ; j++ ) {
+				numi+=(gsl_vector_get(vc_,j)==i)?1:0;
+			}
+			NperC_.push_back(numi);
+		}
+	}
 }
 
 void
@@ -200,7 +211,18 @@ node_indices::apply_rot_trans( particles px , int I){
 	if(bUtSet_){
 		if(I>=0)
 			apply_fit( px, U_, t_	);
-		if(I<0 )
+		if(I<0)
+			apply_fit( px, iU_, it_	);
+	}
+	return px;
+}
+
+particles 
+node_indices::apply_rot_trans( particles px ){
+	if(bUtSet_){
+		if(sgn_>=0)
+			apply_fit( px, U_, t_	);
+		if(sgn_<0)
 			apply_fit( px, iU_, it_	);
 	}
 	return px;
@@ -257,21 +279,26 @@ node_indices::find_centroid_relation(cluster c1, cluster c2){
 			min_rmsd=rmsd;	
 			gsl_matrix_memcpy (Ut, U);
 			gsl_vector_memcpy (tt, t);
-
 		}
 	}
 
-	for(int i=0;i<iv.size();i++)
-		idx_.push_back(imv[J][i]);
+	if(idx_.size()==0) { 
+		for(int i=0;i<iv.size();i++) // THIS IS WHAT WE WANTED
+			idx_.push_back(imv[J][i]);
+	} else {
+		std::cout << "INFO::ERROR WITH IDX_" << std::endl;
+		idx_.clear();
+		for(int i=0;i<iv.size();i++)
+			idx_.push_back(imv[J][i]);
+	}
 
 	bDirRel_=2*(c1.length_M()>c2.length_M())-1;
 
-	if( !have_transform() ){
-		gsl_matrix_memcpy (U_, Ut);
-		gsl_vector_memcpy (t_, tt);
-		invert_transform();
-		bUtSet_=1;
-	}
+	gsl_matrix_memcpy (U_, Ut);
+	gsl_vector_memcpy (t_, tt);
+	invert_transform();
+	bUtSet_=1;
+	sgn_=1;
 
 	gsl_matrix_free(CNT);
 	gsl_matrix_free(C0N);
@@ -283,48 +310,100 @@ node_indices::find_centroid_relation(cluster c1, cluster c2){
 	return min_rmsd;
 }
 
+/*
 ftyp
 node_indices::find_shape_relation( cluster c1, cluster c2 ){
-// for all coordinates belonging to
-// each centroid in c1 check each set in c2
-// number of centroids must be the same in each class
-// return the best shape match
 	ftyp min_rmsd	= 1.0E10;
+////	IS THE NUMBER OF CLUSTERS
+	int N 		= c1.length_C();
+	int dN 		= c1.length_M();
+	gmat *M01	= gsl_matrix_calloc( DIM, dN );
+	gvec *v01	= gsl_vector_calloc( dN );
+	c1.copyM(M01);
+	c1.copyv(v01);
 
-	int N = c1.length_C();
+	int dM 		= c2.length_M();
+	gmat *M02	= gsl_matrix_calloc( DIM, dM );
+	gvec *v02	= gsl_vector_calloc( dM );
+	c2.copyM(M02);
+	c2.copyv(v02);
 
 	if(N != c2.length_C())
-		std::cout <<"ERROR IN IDX REL"<<std::endl;
+		std::cout << "ERROR IN IDX REL" << std::endl;
 
 	gmat *U		= gsl_matrix_calloc( DIM, DIM );
 	gvec *t		= gsl_vector_calloc( DIM );
+	gmat *Ut 	= gsl_matrix_calloc( DIM, DIM );
+	gvec *tt 	= gsl_vector_calloc( DIM );
 
 	int J		= 0;
 
-	gmat *C0T	= gsl_matrix_calloc( DIM, N );
-	gmat *C0N	= gsl_matrix_calloc( DIM, N );
-	gmat *CNT	= gsl_matrix_calloc( DIM, N );
-	gmat *CEN	= gsl_matrix_calloc( DIM, N );
 	gvec *gv 	= gsl_vector_calloc( DIM );
+	std::vector<gmat*> cluM1;
+	std::vector<gmat*> cluM2;
 
-	c1.copyC(C0N);
-	c2.copyC(C0T);
-
-	gmat *Ut = gsl_matrix_calloc( DIM, DIM );
-	gvec *tt = gsl_vector_calloc( DIM );
-
-	std::vector<int> iv;
-	for( int i=0 ; i<N ; i++ )
+	std::vector<int> iv,ip1,ip2;
+	for( int i=0 ; i<N ; i++ ) {
 		iv.push_back(i);
+		ip1.push_back(0); ip2.push_back(0);
+		gmat *tempM1= gsl_matrix_calloc( DIM, c1.NpC(i) );
+		gmat *tempM2= gsl_matrix_calloc( DIM, c2.NpC(i) );
+		cluM1.push_back(tempM1);
+		cluM2.push_back(tempM2);
+	}
+	for( int i=0 ; i<dN ; i++ ) {
+		int ic = gsl_vector_get(  v01, i );
+		gsl_matrix_get_col ( gv , M01, i );
+		gsl_matrix_set_col ( cluM1[ic],ip1[ic]++, gv );
+	}
+	for( int i=0 ; i<dM ; i++ ) {
+		int ic = gsl_vector_get(  v02, i );
+		gsl_matrix_get_col ( gv , M02, i );
+		gsl_matrix_set_col ( cluM2[ic],ip2[ic]++, gv );
+	}
+
 	std::vector<std::vector<int> > imv = all_permutations(iv);
 	for( int j=0 ; j<imv.size() ; j++ ) { 
-		// do all the shape fits
-		for(int i=0;i<iv.size();i++) {
-			// load all our coordinates into gmats
-			// i in c1 :: imv[j][i] in c2
+		ftyp rmsd = 0.0;
+		for(int i = 0; i < iv.size() ; i++ ) {
+			gmat *ONE = gsl_matrix_alloc( cluM1[i]->size1 , cluM1[i]->size2 );
+			gmat *TWO = gsl_matrix_alloc( cluM2[imv[j][i]]->size1 , cluM2[imv[j][i]]->size2 );
+			gsl_matrix_memcpy ( ONE, cluM1[i] );
+			gsl_matrix_memcpy ( TWO, cluM2[imv[j][i]] );
+			rmsd += shape_fit ( TWO, ONE, U, t );
+		}
+		rmsd /= iv.size();
+
+		if(rmsd<min_rmsd){
+			J=j; 
+			min_rmsd=rmsd;	
+			gsl_matrix_memcpy (Ut, U);
+			gsl_vector_memcpy (tt, t);
 		}
 	}
+
+	if(idx_.size()==0) { 
+		for(int i=0;i<iv.size();i++) // THIS IS WHAT WE WANTED
+			idx_.push_back(imv[J][i]);
+	} else {
+		std::cout << "INFO::ERROR WITH IDX_" << std::endl;
+		idx_.clear();
+		for(int i=0;i<iv.size();i++)
+			idx_.push_back(imv[J][i]);
+	}
+
+	bDirRel_=2*(c1.length_M()>c2.length_M())-1;
+	find_shape_trans( c1, c2 );
+
+	gsl_matrix_free(Ut);
+	gsl_vector_free(tt);
+	gsl_vector_free(v01);
+	gsl_matrix_free(M01);
+	gsl_matrix_free(M02);
+	gsl_vector_free(v02);
+
 }
+*/
 
 ftyp
 node_indices::find_shape_trans( cluster c1, cluster c2 ){
@@ -343,12 +422,11 @@ node_indices::find_shape_trans( cluster c1, cluster c2 ){
 
 	ftyp min_rmsd = shape_fit(MNT,MEN,U,t);
 
-	if( !have_transform() ){
-		gsl_matrix_memcpy (U_, U);
-		gsl_vector_memcpy (t_, t);
-		invert_transform();
-		bUtSet_=1;
-	}
+	gsl_matrix_memcpy (U_, U);
+	gsl_vector_memcpy (t_, t);
+	invert_transform();
+	bUtSet_=1;
+	sgn_=-1;
 
 	gsl_matrix_free(MNT);
 	gsl_matrix_free(MEN);

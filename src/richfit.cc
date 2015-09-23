@@ -326,8 +326,10 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 
 	gsl_blas_dgemm(CblasNoTrans,CblasTrans, 1.0, V1, V2, 0.0, C);
 	ftyp det = get_det(C);
+
 	int JJ=(det<0)?4:0;
-	for(int II=JJ;II<(JJ+4);II++){
+//	for(int II=JJ;II<(JJ+4);II++){
+	for(int II=0;II<8;II++){
 		gsl_vector_memcpy(tt, p0);
 		gsl_matrix_set_identity( EYE );
 		switch(II){
@@ -344,6 +346,7 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 		gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, V2, 0.0, TMP ); // CblasNoTrans, CblasTrans
 		gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, V1, TMP, 0.0, C ); // CblasNoTrans, CblasNoTrans	
 		gsl_matrix_memcpy( Ut , C );
+
 		gsl_blas_dgemv( CblasNoTrans, -1.0, Ut, q0, 1.0, tt );
 
 		gsl_matrix_memcpy( DIF, sqQ );
@@ -356,11 +359,12 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 				 + square(gsl_matrix_get(DIF,ZZ,i)) );
 		}
 		rmsd /= cnt;
-		if(rmsd<min_rmsd){
+		if( rmsd < min_rmsd ){
 			gsl_matrix_memcpy( U , Ut );
 			gsl_vector_memcpy( t , tt );
+			ftyp detC = get_det(C);
 			min_rmsd=rmsd;
-			//std::cout <<"INFO::" << II << std::endl;
+			std::cout <<"INFO::" << II << " " << det << " " << detC << std::endl;
 		}
 	}
 	gsl_matrix_free(EYE);	gsl_matrix_free(sqP);
