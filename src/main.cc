@@ -171,7 +171,7 @@ int main (int argc, char **argv) {
 	int D		= coord_space.size();
 	int B		= carth_space.size();
 
-	richanalysis::cluster cl1, cl2, cl_test;
+	richanalysis::cluster cl1, cl2, cl_test_d, cl_test_m;
 
 	cl1.alloc_space(D,N); 
 	cl2.alloc_space(B,N);
@@ -179,20 +179,41 @@ int main (int argc, char **argv) {
 	cl1.set_matrix( coord_space ); 	
 	cl2.set_matrix( carth_space );
 
-	cl_test.alloc_space(D,B); 
-	cl_test.set_matrix( coord_space );
-	cl_test.perform_clustering(0.0);
+//	DENS TO ALL CENTROID
+/*
+	cl_test_d.alloc_space(D,B); 
+	cl_test_d.set_matrix( coord_space );
+	cl_test_d.perform_clustering();
 	gmat *Mtest = gsl_matrix_alloc(DIM,B);
 	gvec *vtest = gsl_vector_alloc(B);
-	cl_test.copyC(Mtest);
-	cl_test.copyw(vtest);
+	cl_test_d.copyC(Mtest);
+	cl_test_d.copyw(vtest);
 	richanalysis::fileIO fio;
-	fio.output_pdb("cltest.pdb", Mtest, vtest);
+	fio.output_pdb("cltest_d.pdb", Mtest, vtest);
+	gsl_matrix_free(Mtest);
+	gsl_vector_free(vtest);
 
+	cl_test_m.alloc_space(B,B); 
+	cl_test_m.set_matrix( carth_space );
+	cl_test_m.perform_clustering();
+	gmat *Mtes = gsl_matrix_alloc(DIM,B);
+	gvec *vtes = gsl_vector_alloc(B);
+	cl_test_m.copyC(Mtes);
+	cl_test_m.copyw(vtes);
+	fio.output_pdb("cltest_m.pdb", Mtes, vtes);
+	gsl_matrix_free(Mtes);
+	gsl_vector_free(vtes);
+
+	richanalysis::node_indices ridx;
+	ftyp	std;
+	std = ridx.find_centroid_relation(cl_test_d,cl_test_m);
+	std::vector<int> full_a_ndx = ridx.get_indices();
+*/
+//
 	cl1.perform_clustering(); 
 	cl2.perform_clustering();
 
-	int isw = 1;
+	int isw = 0;
 
 	richanalysis::node_indices nidx;
 
@@ -213,10 +234,12 @@ int main (int argc, char **argv) {
 	for(int i=0; i<den_ndx.size(); i++) {
 		nden += den_ndx[i]==icl?1:0;
 	}
+
 	for(int i=0; i<crd_ndx.size(); i++) {
 		fio_ndx.push_back( rel_ndx[crd_ndx[i]] );
 		nmod += rel_ndx[crd_ndx[i]]==icl?1:0;
 	}
+
 	particles align_space;
 	align_space = nidx.apply_rot_trans( carth_space );
 	fIO.output_pdb("mod"+ns+".pdb", align_space, fio_ndx);
@@ -260,7 +283,8 @@ int main (int argc, char **argv) {
 	fIO.output_pdb("frag"+ns+".pdb", pfrag , ord_ndx );
 
 //	THIS IS THE DENSITY WE ARE FITTING TO
-	fIO.output_pdb("dens"+ns+".pdb", coord_space , den_ndx);
+	std::string alabel("Xe");
+	fIO.output_pdb("dens"+ns+".pdb", coord_space , den_ndx , alabel);
 
 	return 0;
 }

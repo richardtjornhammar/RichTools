@@ -264,7 +264,7 @@ clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw, fty
 				for ( j = XX; j<=ZZ ; j++ ) {
 					distance += square( gsl_matrix_get( dat,j,h ) - gsl_matrix_get( cent,j,i ) );
 				}
-				if (distance < min_distance  && distance > square(cutoff) ) { // 
+				if ( distance < min_distance   ) { // && distance > square(cutoff)
 	 				gsl_vector_set(labels,h,i); min_distance = distance; 
 				} 
 			} 
@@ -387,11 +387,14 @@ node_indices::find_centroid_relation(cluster c1, cluster c2){
 
 	bDirRel_=2*(c1.length_M()>c2.length_M())-1;
 
-	gsl_matrix_memcpy (U_, Ut);
-	gsl_vector_memcpy (t_, tt);
-	invert_transform();
-	bUtSet_=1;
-	sgn_=1;
+//	if(!have_transform())
+	{
+		gsl_matrix_memcpy (U_, Ut);
+		gsl_vector_memcpy (t_, tt);
+		invert_transform();
+		bUtSet_=1;
+		sgn_=1;
+	}
 
 	gsl_matrix_free(CNT);
 	gsl_matrix_free(C0N);

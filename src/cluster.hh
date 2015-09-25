@@ -106,8 +106,8 @@ namespace richanalysis {
 			particles 		apply_rot_trans( particles , int );
 			particles 		apply_rot_trans( particles );
 			void			invert_transform(void);
-			void			printUt(void){output_matrix(U_);output_vector(t_);};
-			void			printiUt(void){output_matrix(iU_);output_vector(it_);};
+			void			printUt(void){  output_matrix(U_); output_vector(t_); };
+			void			printiUt(void){ output_matrix(iU_);output_vector(it_);};
 		private:
 			int bDirRel_;
 			std::vector<int> idx_;

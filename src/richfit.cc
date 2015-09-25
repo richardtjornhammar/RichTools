@@ -215,13 +215,13 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 	gsl_vector_memcpy(t, p0);
 	switch(II){
 		case  0: break;
-		case  1: gsl_matrix_set  ( EYE,  0,  0, -1.0 ); gsl_matrix_set( EYE,  1,  1, -1.0 ); break;
-		case  2: gsl_matrix_set  ( EYE,  0,  0, -1.0 ); gsl_matrix_set( EYE,  1,  1, -1.0 ); break;
-		case  3: gsl_matrix_set  ( EYE,  2,  2, -1.0 ); gsl_matrix_set( EYE,  2,  2, -1.0 ); break;
-		case  4: gsl_matrix_set  ( EYE,  0,  0, -1.0 ); break;
-		case  5: gsl_matrix_set  ( EYE,  2,  2, -1.0 ); break;
-		case  6: gsl_matrix_scale( EYE, -1.0); break;
-		case  7: gsl_matrix_set  ( EYE,  1,  1, -1.0 ); break;
+		case  1: gsl_matrix_set  ( EYE,  XX, XX, -1.0 ); gsl_matrix_set( EYE, YY, YY, -1.0 ); break;
+		case  2: gsl_matrix_set  ( EYE,  XX, XX, -1.0 ); gsl_matrix_set( EYE, ZZ, ZZ, -1.0 ); break;
+		case  3: gsl_matrix_set  ( EYE,  YY, YY, -1.0 ); gsl_matrix_set( EYE, ZZ, ZZ, -1.0 ); break;
+		case  4: gsl_matrix_set  ( EYE,  XX, XX, -1.0 ); break;
+		case  5: gsl_matrix_set  ( EYE,  YY, YY, -1.0 ); break;
+		case  6: gsl_matrix_set  ( EYE,  ZZ, ZZ, -1.0 ); break;
+		case  7: gsl_matrix_scale( EYE, -1.0); break;
 		default: break;
 	}
 	gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, V2, 0.0, TMP ); // CblasNoTrans, CblasTrans
@@ -329,18 +329,20 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 
 	int JJ=(det<0)?4:0;
 //	for(int II=JJ;II<(JJ+4);II++){
-	for(int II=0;II<8;II++){
+//	for(int II=0;II<8;II++)
+	{
+		int II=JJ;
 		gsl_vector_memcpy(tt, p0);
 		gsl_matrix_set_identity( EYE );
 		switch(II){
 			case  0: break;
-			case  1: gsl_matrix_set  ( EYE,  0,  0, -1.0 ); gsl_matrix_set( EYE,  1,  1, -1.0 ); break;
-			case  2: gsl_matrix_set  ( EYE,  0,  0, -1.0 ); gsl_matrix_set( EYE,  1,  1, -1.0 ); break;
-			case  3: gsl_matrix_set  ( EYE,  2,  2, -1.0 ); gsl_matrix_set( EYE,  2,  2, -1.0 ); break;
-			case  4: gsl_matrix_set  ( EYE,  0,  0, -1.0 ); break;
-			case  5: gsl_matrix_set  ( EYE,  2,  2, -1.0 ); break;
-			case  6: gsl_matrix_scale( EYE, -1.0); break;
-			case  7: gsl_matrix_set  ( EYE,  1,  1, -1.0 ); break;
+			case  1: gsl_matrix_set  ( EYE,  XX, XX, -1.0 ); gsl_matrix_set( EYE, YY, YY, -1.0 ); break;
+			case  2: gsl_matrix_set  ( EYE,  XX, XX, -1.0 ); gsl_matrix_set( EYE, ZZ, ZZ, -1.0 ); break;
+			case  3: gsl_matrix_set  ( EYE,  YY, YY, -1.0 ); gsl_matrix_set( EYE, ZZ, ZZ, -1.0 ); break;
+			case  4: gsl_matrix_set  ( EYE,  XX, XX, -1.0 ); break;
+			case  5: gsl_matrix_set  ( EYE,  YY, YY, -1.0 ); break;
+			case  6: gsl_matrix_set  ( EYE,  ZZ, ZZ, -1.0 ); break;
+			case  7: gsl_matrix_scale( EYE, -1.0); break;
 			default: break;
 		}
 		gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, V2, 0.0, TMP ); // CblasNoTrans, CblasTrans
@@ -434,7 +436,7 @@ fitting::kabsch_fit(	gsl_matrix *P, gsl_matrix *Q,			// IN
 	double det = get_det(C);
 
 	if (det < 0){	// FLIP IT!
-		gsl_matrix_set(EYE,D-1,D-1,-1);
+		gsl_matrix_set(EYE,ZZ,ZZ,-1);
 		gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, W, 0.0, TMP);
 		gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, V, TMP, 0.0, C);
 	}
