@@ -56,9 +56,12 @@ namespace richanalysis {
 			int gsl_kmeans( gmat *, gvec *, gmat *, gvec *, ftyp );
 	};
 
-	class cluster : public clustering, public tensorIO {
+	class cluster : public clustering, public linalg, public tensorIO {
 		public:
-			cluster() { bSet_[0]=0; bSet_[1]=0; bSet_[2]=0; bSet_[3]=0; };
+			cluster() { 	bSet_[0]=0; bSet_[1]=0; bSet_[2]=0; bSet_[3]=0; bPCset_=0;
+					Uc_  = gsl_matrix_calloc( DIM, DIM );	tc_ = gsl_vector_calloc( DIM ); 
+					Axis_ = gsl_vector_calloc( DIM );	Euler_ = gsl_vector_calloc( DIM ); };
+
 			std::vector<int>	get_labels  ( void );
 			void			alloc_space ( int, int );
 			void			seM ( int, int, ftyp );
@@ -78,9 +81,19 @@ namespace richanalysis {
 			int			length_M(void){ return M_->size2; };
 			void	copyC(gmat *C0){ if(C0->size1==C_->size1&&C0->size2==C_->size2) { gsl_matrix_memcpy(C0, C_); } };
 			void	copyM(gmat *M0){ if(M0->size1==M_->size1&&M0->size2==M_->size2) { gsl_matrix_memcpy(M0, M_); } };
+			void	copyUc(gmat *U0){ if(U0->size1==Uc_->size1&&U0->size2==Uc_->size2) { gsl_matrix_memcpy(U0, Uc_); } };
+			void	copytc(gvec *tc0){ if(tc0->size ==tc_->size) { gsl_vector_memcpy(tc0, tc_); } };
 			void	copyv(gvec *v0){ if(v0->size ==vc_->size) { gsl_vector_memcpy(v0, vc_); } };
 			void	copyw(gvec *w0){ if(w0->size ==wc_->size) { gsl_vector_memcpy(w0, wc_); } };
 			int	NpC(int i){ if(NperC_.size()>0&&i<NperC_.size()){ return NperC_[i]; } };
+			bool			isSet(){return bSet_[0]>0&&bSet_[1]>0&&bSet_[2]>0&&bSet_[3]>0;}
+			ftyp			find_shape();
+		//! Calculates the shape
+			ftyp			shape(	gmat *P , gmat *U , gvec *t 	);
+			void			print_shape( void ) { output_matrix( Uc_ ); };
+			bool			has_shape(void){return (bPCset_==1); };
+			particle		normal(void);
+			particle		center(void);
 			~cluster() {}
 	private:
 		gmat	*M_; 		// 0 THE ORIGINAL COORDINATES 
@@ -89,6 +102,13 @@ namespace richanalysis {
 		gvec	*wc_;		// 1 UNSORTED LABELS
 		int	bSet_[4];
 		std::vector<int>	NperC_;
+//	shape stuff
+		gmat *Uc_;
+		gvec *tc_;
+		gvec *Euler_;
+		gvec *Axis_;	
+		ftyp angle_;
+		int bPCset_;
 	};
 
 	class node_indices : public fitting {
@@ -108,6 +128,7 @@ namespace richanalysis {
 			void			invert_transform(void);
 			void			printUt(void){  output_matrix(U_); output_vector(t_); };
 			void			printiUt(void){ output_matrix(iU_);output_vector(it_);};
+			ftyp			angle_between(cluster c1, cluster c2);
 		private:
 			int bDirRel_;
 			std::vector<int> idx_;

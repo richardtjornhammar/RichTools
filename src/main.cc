@@ -248,6 +248,7 @@ int main (int argc, char **argv) {
 	particles pfrag;
 	std::vector<int> ord_ndx;
 	int M=N;
+	std::vector<richanalysis::cluster > vclus;
 	for( int ipart=0;ipart<N;ipart++){
 		particles px,dx,rtx;
 		richanalysis::coord_format cf;
@@ -268,6 +269,9 @@ int main (int argc, char **argv) {
 		cldx.perform_clustering();	
 		clpx.perform_clustering();
 
+		cldx.find_shape();
+		vclus.push_back(cldx);
+	
 		richanalysis::node_indices cidx;
 
 		if(isw) //WE ARE ALREADY IN CORRECT CENTROID SO JUST SHAPEFIT
@@ -282,8 +286,17 @@ int main (int argc, char **argv) {
 	}
 	fIO.output_pdb("frag"+ns+".pdb", pfrag , ord_ndx );
 
+	richanalysis::node_indices crel;
+	for(int i=0;i<vclus.size()-1;i++){
+		crel.angle_between(vclus[i],vclus[i+1]);
+	}
+	for(int i=0;i<vclus.size();i++){
+		coord_space.push_back(vclus[i].normal());
+		coord_space.push_back(vclus[i].center());
+		den_ndx.push_back(i);den_ndx.push_back(i);
+	}
 //	THIS IS THE DENSITY WE ARE FITTING TO
-	std::string alabel("Xe");
+	std::string alabel("H");
 	fIO.output_pdb("dens"+ns+".pdb", coord_space , den_ndx , alabel);
 
 	return 0;

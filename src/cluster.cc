@@ -141,6 +141,7 @@ cluster::set_matrix( particles coord_space ) {
 			}
 		}
 		gsl_vector_set_all ( vc_ , 1.0 ); // potentially set with label
+		bSet_[0] = 1; bSet_[1] = 1;
 		return  0;
 	}else{
 		std::cout << "ERROR:: BAD CONTAINER LENGTHS:: calc_distance_matrix" << std::endl;
@@ -500,6 +501,140 @@ node_indices::find_shape_relation( cluster c1, cluster c2 ){
 
 }
 */
+
+ftyp
+cluster::find_shape(){
+//	Do a single shape fit
+
+	if( isSet() ) { 
+		int N 		= length_M();
+		gmat *MEN	= gsl_matrix_calloc( DIM, N );
+		copyM(MEN);
+	
+		gmat *Utmp	= gsl_matrix_calloc( DIM, DIM );
+		gvec *ttmp	= gsl_vector_calloc( DIM );
+		
+		ftyp min_rmsd 	= shape(MEN,Utmp,ttmp);
+
+		gsl_matrix_memcpy (Uc_, Utmp);
+		gsl_vector_memcpy (tc_, ttmp);
+		bPCset_		=	1;
+
+		gsl_matrix_free(MEN);
+		gsl_matrix_free(Utmp); 
+		gsl_vector_free(ttmp);
+	}
+
+	return 0.0;
+}
+
+
+ftyp 
+cluster::shape(		gmat *P, gmat *U , gvec *t 	) 
+{	
+	if( !(	   P->size1 
+		&& U->size1 == U->size2 && U->size1 == P->size1 
+		&& t->size  == P->size1 && P->size1 <= P->size2 ) )
+		return(-1.0); 		// PROBLEMS WITH THE DIMENSIONS
+
+	int 	L = ((int)P->size2),
+		D = ((int)P->size1);	// MATRIX DIMS
+
+	ftyp wsum = P->size2;
+	if( wsum <= 0.0 ) {
+		return(-2.0); 		// PROBLEMS WITH VALUE
+	}
+
+	gsl_vector *w = gsl_vector_alloc((int)P->size2);
+	gsl_vector_set_all( w , 1.0/wsum );
+	gsl_vector *p0 = gsl_vector_alloc(D);
+
+	calc_centroid(P,w,p0); center_matrix(P,p0);
+	gsl_matrix *wP = gsl_matrix_alloc(P->size1,P->size2);
+	calc_vmprod( w, P, wP );
+
+	gsl_matrix *W	= gsl_matrix_alloc( D, D );
+	gsl_matrix *V   = gsl_matrix_alloc( L, D );
+	gsl_matrix *C   = gsl_matrix_alloc( L, D );
+	gsl_matrix_transpose_memcpy (C, wP);
+	gsl_vector *S	= gsl_vector_alloc( D );
+	gsl_vector *wrk = gsl_vector_alloc( D );
+
+	gsl_matrix *TMP = gsl_matrix_alloc( D, D );
+	gsl_matrix *EYE = gsl_matrix_alloc( D, D );
+
+	gsl_linalg_SV_decomp ( C, W, S, wrk );
+	gsl_matrix_memcpy( V, C );
+
+	output_vector(S);
+
+	gsl_matrix_transpose_memcpy(U,W);
+	gsl_vector_memcpy(t, p0);
+
+	gsl_vector_free(w);
+	gsl_vector_free(p0);	
+	gsl_matrix_free( wP);	
+	gsl_matrix_free( W );	
+	gsl_matrix_free( V );
+	gsl_matrix_free( C );
+	gsl_vector_free( S );	
+	gsl_vector_free(wrk);	
+	gsl_matrix_free(TMP);		
+	gsl_matrix_free(EYE);	
+
+	return 0.0;
+}
+
+particle
+cluster::normal( void ){
+	if( has_shape() ){
+		gmat *Uc1	= gsl_matrix_calloc(DIM,DIM);
+		gvec *tc	= gsl_vector_calloc(DIM);
+		copyUc(Uc1);
+		copytc(tc);
+		gvec *a = gsl_vector_calloc(DIM);
+ 		gsl_matrix_get_row (a, Uc1, ZZ);
+		particle par;
+		par.first ="Ag";
+		gsl_vector_add(a,tc);
+		par.second=a;
+		return par;
+	}
+}
+particle
+cluster::center( void ){
+	if( has_shape() ){
+		gvec *tc	= gsl_vector_calloc(DIM);
+		copytc(tc);
+		particle par;
+		par.first ="Ag";
+		par.second=tc;
+		return par;
+	}
+}
+
+ftyp			
+node_indices::angle_between(cluster c1, cluster c2){
+	if( c1.has_shape() && c2.has_shape() ){
+		ftyp a,b,c,x,y,z;
+		gmat *Uc1 = gsl_matrix_calloc(DIM,DIM);
+		c1.copyUc(Uc1);
+		a = gsl_matrix_get(Uc1,XX,ZZ); 
+		b = gsl_matrix_get(Uc1,YY,ZZ); 
+		c = gsl_matrix_get(Uc1,ZZ,ZZ);
+		gmat *Uc2 = gsl_matrix_calloc(DIM,DIM);
+		c2.copyUc(Uc2);
+		x = gsl_matrix_get(Uc2,XX,ZZ); 
+		y = gsl_matrix_get(Uc2,YY,ZZ); 
+		z = gsl_matrix_get(Uc2,ZZ,ZZ);
+		ftyp ilen1=1.0/sqrt(a*a+b*b+c*c);
+		ftyp ilen2=1.0/sqrt(x*x+y*y+z*z);
+		ftyp angle=acos( (x*a+y*b+z*c)*ilen1*ilen2 );
+		gsl_matrix_free(Uc1); gsl_matrix_free(Uc2);
+		std::cout << "INFO::TORSION  " << angle*180/M_PI << std::endl;
+		return angle;
+	}
+}
 
 ftyp
 node_indices::find_shape_trans( cluster c1, cluster c2 ){
