@@ -657,7 +657,7 @@ node_indices::find_shape_trans( cluster c1, cluster c2 ){
 	gsl_vector_memcpy (t_, t);
 	invert_transform();
 	bUtSet_=1;
-	sgn_=1;
+	sgn_=-1;
 
 	gsl_matrix_free(MNT);
 	gsl_matrix_free(MEN);
