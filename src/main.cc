@@ -242,12 +242,33 @@ int main (int argc, char **argv) {
 
 	particles align_space;
 	align_space = nidx.apply_rot_trans( carth_space );
+
+	int M=N;
+	std::vector<richanalysis::cluster > vmode;
+	for( int ipart=0;ipart<N;ipart++){
+		richanalysis::coord_format cf;
+		particles px;
+		px	= cf.par2par(align_space, fio_ndx, ipart);
+		D	= px.size();
+		richanalysis::cluster clpx;
+		if( D<M )
+			M=D;
+		clpx.alloc_space( D, M );
+		clpx.set_matrix( px );
+		clpx.perform_clustering();
+		clpx.find_shape();
+		vmode.push_back(clpx);
+	}
+	richanalysis::node_indices mrel;
+	for(int i=0;i<vmode.size()-1;i++){
+		mrel.angle_between(vmode[i],vmode[i+1]);
+	}
 	fIO.output_pdb("mod"+ns+".pdb", align_space, fio_ndx);
 
 //	HERE WE ALIGN FRAGMENTS
 	particles pfrag;
 	std::vector<int> ord_ndx;
-	int M=N;
+	M=N;
 	std::vector<richanalysis::cluster > vclus;
 	for( int ipart=0;ipart<N;ipart++){
 		particles px,dx,rtx;

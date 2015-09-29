@@ -301,8 +301,8 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 	gsl_vector *S1	= gsl_vector_alloc( D );
 	gsl_vector *wrk1= gsl_vector_alloc( D );
 
-	gsl_linalg_SV_decomp ( C, W1, S1, wrk1 );
-	gsl_matrix_memcpy( V1, C );	// HAVE ROTATION
+	gsl_linalg_SV_decomp ( C, V1, S1, wrk1 );
+	gsl_matrix_memcpy( W1, C );	// HAVE ROTATION
 
 	gsl_blas_dgemm(CblasNoTrans,CblasTrans, 1.0, w2Q, w2Q, 0.0, C);
 	gsl_matrix_memcpy( sqQ, C );
@@ -313,8 +313,8 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 	gsl_vector *S2	= gsl_vector_alloc( D );
 	gsl_vector *wrk2= gsl_vector_alloc( D );
 
-	gsl_linalg_SV_decomp ( C, W2, S2, wrk2 );
-	gsl_matrix_memcpy( V2, C );	// HAVE ROTATION
+	gsl_linalg_SV_decomp ( C, V2, S2, wrk2 );
+	gsl_matrix_memcpy( W2, C );	// HAVE ROTATION
 
 ////	ROTATION	FOR THE MODEL (Q)
 //	TAKE NOTE OF THE RESULTING SIGN ON U
@@ -324,7 +324,7 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 	gsl_matrix_memcpy( Ut , U );
 	ftyp cnt=(ftyp)DIM;
 
-	gsl_blas_dgemm(CblasNoTrans,CblasTrans, 1.0, V1, W2, 0.0, C);
+	gsl_blas_dgemm(CblasNoTrans,CblasTrans, 1.0, W1, W2, 0.0, C);
 	ftyp det = get_det(C);
 
 	int JJ=(det<0)?6:0;
@@ -346,7 +346,7 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 			default: break;
 		}
 		gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, W2, 0.0, TMP ); // CblasNoTrans, CblasTrans
-		gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, V1, TMP, 0.0, C ); // CblasNoTrans, CblasNoTrans	
+		gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, W1, TMP, 0.0, C ); // CblasNoTrans, CblasNoTrans	
 		gsl_matrix_memcpy( Ut , C );
 
 		gsl_blas_dgemv( CblasNoTrans, -1.0, Ut, q0, 1.0, tt );
@@ -424,20 +424,20 @@ fitting::kabsch_fit(	gsl_matrix *P, gsl_matrix *Q,			// IN
 	gsl_vector *S	= gsl_vector_alloc( D );
 	gsl_vector *work= gsl_vector_alloc( D );
 
-	gsl_linalg_SV_decomp( C, W, S, work );
-	gsl_matrix_memcpy( V, C );
+	gsl_linalg_SV_decomp( C, V, S, work );
+	gsl_matrix_memcpy( W, C );
 	
 	gsl_matrix *EYE = gsl_matrix_alloc( D, D );
 	gsl_matrix *TMP = gsl_matrix_alloc( D, D );
 	
 	gsl_matrix_set_identity( EYE );
 	
-	gsl_blas_dgemm(CblasNoTrans,CblasTrans, 1.0, V, W, 0.0, C);
+	gsl_blas_dgemm(CblasNoTrans,CblasTrans, 1.0, W, V, 0.0, C);
 	double det = get_det(C);
 	if (det < 0){	// FLIP IT!
 		gsl_matrix_set(EYE,ZZ,ZZ,-1);
-		gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, W, 0.0, TMP);
-		gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, V, TMP, 0.0, C);
+		gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, V, 0.0, TMP);
+		gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, W, TMP, 0.0, C);
 	}
 	gsl_matrix_transpose_memcpy(U,C);
 

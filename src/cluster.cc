@@ -627,9 +627,23 @@ node_indices::angle_between(cluster c1, cluster c2){
 		x = gsl_matrix_get(Uc2,XX,ZZ); 
 		y = gsl_matrix_get(Uc2,YY,ZZ); 
 		z = gsl_matrix_get(Uc2,ZZ,ZZ);
+
+		gvec *tc1	= gsl_vector_calloc(DIM);
+		c1.copytc(tc1);
+		gvec *tc2	= gsl_vector_calloc(DIM);
+		c2.copytc(tc2);
+		gsl_vector_sub(tc2,tc1);
+
+		ftyp dx = gsl_vector_get(tc2,XX);
+		ftyp dy = gsl_vector_get(tc2,YY);
+		ftyp dz = gsl_vector_get(tc2,ZZ);
+
+		ftyp dlen0=1.0/sqrt(dx*dx+dy*dy+dz*dz);
 		ftyp ilen1=1.0/sqrt(a*a+b*b+c*c);
 		ftyp ilen2=1.0/sqrt(x*x+y*y+z*z);
-		ftyp angle=acos( (x*a+y*b+z*c)*ilen1*ilen2 );
+
+		ftyp angle=atan2( (dx*(b*z-c*y)+dy*(c*x-a*z)+dz*(a*y-b*x))*dlen0*ilen1*ilen2 , (a*x+b*y+c*z)*ilen1*ilen2 );
+
 		gsl_matrix_free(Uc1); gsl_matrix_free(Uc2);
 		std::cout << "INFO::TORSION  " << angle*180/M_PI << std::endl;
 		return angle;
