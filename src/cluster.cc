@@ -553,8 +553,8 @@ cluster::shape(		gmat *P, gmat *U , gvec *t 	)
 	gsl_matrix *wP = gsl_matrix_alloc(P->size1,P->size2);
 	calc_vmprod( w, P, wP );
 
-	gsl_matrix *W	= gsl_matrix_alloc( D, D );
-	gsl_matrix *V   = gsl_matrix_alloc( L, D );
+	gsl_matrix *W	= gsl_matrix_alloc( L, D );
+	gsl_matrix *V   = gsl_matrix_alloc( D, D );
 	gsl_matrix *C   = gsl_matrix_alloc( L, D );
 	gsl_matrix_transpose_memcpy (C, wP);
 	gsl_vector *S	= gsl_vector_alloc( D );
@@ -563,12 +563,12 @@ cluster::shape(		gmat *P, gmat *U , gvec *t 	)
 	gsl_matrix *TMP = gsl_matrix_alloc( D, D );
 	gsl_matrix *EYE = gsl_matrix_alloc( D, D );
 
-	gsl_linalg_SV_decomp ( C, W, S, wrk );
-	gsl_matrix_memcpy( V, C );
+	gsl_linalg_SV_decomp ( C, V, S, wrk );
+	gsl_matrix_memcpy( W, C );
 
 	output_vector(S);
 
-	gsl_matrix_transpose_memcpy(U,W);
+	gsl_matrix_transpose_memcpy(U,V);
 	gsl_vector_memcpy(t, p0);
 
 	gsl_vector_free(w);
@@ -587,6 +587,7 @@ cluster::shape(		gmat *P, gmat *U , gvec *t 	)
 
 particle
 cluster::normal( void ){
+	particle par;
 	if( has_shape() ){
 		gmat *Uc1	= gsl_matrix_calloc(DIM,DIM);
 		gvec *tc	= gsl_vector_calloc(DIM);
@@ -594,10 +595,11 @@ cluster::normal( void ){
 		copytc(tc);
 		gvec *a = gsl_vector_calloc(DIM);
  		gsl_matrix_get_row (a, Uc1, ZZ);
-		particle par;
 		par.first ="Ag";
 		gsl_vector_add(a,tc);
 		par.second=a;
+		return par;
+	}else{
 		return par;
 	}
 }
@@ -615,6 +617,7 @@ cluster::center( void ){
 
 ftyp			
 node_indices::angle_between(cluster c1, cluster c2){
+
 	if( c1.has_shape() && c2.has_shape() ){
 		ftyp a,b,c,x,y,z;
 		gmat *Uc1 = gsl_matrix_calloc(DIM,DIM);
@@ -647,7 +650,10 @@ node_indices::angle_between(cluster c1, cluster c2){
 		gsl_matrix_free(Uc1); gsl_matrix_free(Uc2);
 		std::cout << "INFO::TORSION  " << angle*180/M_PI << std::endl;
 		return angle;
+	}else{
+		return -1000.0;
 	}
+
 }
 
 ftyp

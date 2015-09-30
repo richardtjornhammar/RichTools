@@ -127,7 +127,8 @@ int main (int argc, char **argv) {
 
 	richanalysis::fileIO fIO;
 	particles coord_space, carth_space;
-	int N=10;
+	int N		= 10;
+	bool bFit	= true;
 
 	switch( argc ) {
 		case 4: {
@@ -146,6 +147,9 @@ int main (int argc, char **argv) {
 			}
 		case 3: {
 				N=atoi(argv[2]);
+				bFit=(N>=0);
+				if(!bFit)
+					N*=-1;
 			}
 		case 2: {
 				std::string tmpline( argv[1] );
@@ -179,53 +183,47 @@ int main (int argc, char **argv) {
 	cl1.set_matrix( coord_space ); 	
 	cl2.set_matrix( carth_space );
 
-//	DENS TO ALL CENTROID
-/*
-	cl_test_d.alloc_space(D,B); 
-	cl_test_d.set_matrix( coord_space );
-	cl_test_d.perform_clustering();
-	gmat *Mtest = gsl_matrix_alloc(DIM,B);
-	gvec *vtest = gsl_vector_alloc(B);
-	cl_test_d.copyC(Mtest);
-	cl_test_d.copyw(vtest);
-	richanalysis::fileIO fio;
-	fio.output_pdb("cltest_d.pdb", Mtest, vtest);
-	gsl_matrix_free(Mtest);
-	gsl_vector_free(vtest);
-
-	cl_test_m.alloc_space(B,B); 
-	cl_test_m.set_matrix( carth_space );
-	cl_test_m.perform_clustering();
-	gmat *Mtes = gsl_matrix_alloc(DIM,B);
-	gvec *vtes = gsl_vector_alloc(B);
-	cl_test_m.copyC(Mtes);
-	cl_test_m.copyw(vtes);
-	fio.output_pdb("cltest_m.pdb", Mtes, vtes);
-	gsl_matrix_free(Mtes);
-	gsl_vector_free(vtes);
-
-	richanalysis::node_indices ridx;
-	ftyp	std;
-	std = ridx.find_centroid_relation(cl_test_d,cl_test_m);
-	std::vector<int> full_a_ndx = ridx.get_indices();
-*/
-//
 	cl1.perform_clustering(); 
 	cl2.perform_clustering();
+	std::vector<int> den_ndx = cl1.get_labels();
+	std::vector<int> crd_ndx = cl2.get_labels();
+
+	if(!bFit){
+// NCULSTS 1/12 with H 1/8 without
+		fIO.output_pdb("mod-nofit-n"+ns+".pdb", carth_space , crd_ndx);
+		richanalysis::node_indices mod_rel;
+
+		int M=N;
+		std::vector<richanalysis::cluster > vmode;
+		for( int ipart=0;ipart<N;ipart++){
+			richanalysis::coord_format cf;
+			particles px;
+			px	= cf.par2par(carth_space, crd_ndx, ipart);
+			D	= px.size();
+			richanalysis::cluster clpx;
+			if( D<M )
+				M=D;
+			clpx.alloc_space( D, 3 );
+			clpx.set_matrix( px );
+			clpx.perform_clustering();
+			clpx.find_shape();
+			vmode.push_back(clpx);
+		}
+
+		for(int i=0;i<vmode.size()-1;i++){
+			mod_rel.angle_between(vmode[i],vmode[i+1]);
+		}
+		return (0);
+	}
 
 	int isw = 0;
-
 	richanalysis::node_indices nidx;
 
 	ftyp rmsd = 0.0;
-
 	rmsd = nidx.find_centroid_relation(cl1,cl2);
-
 	std::cout << ":INFO:RMSD:" << std::endl << rmsd << std::endl;	
 
 	std::vector<int> rel_ndx = nidx.get_indices();
-	std::vector<int> den_ndx = cl1.get_labels();
-	std::vector<int> crd_ndx = cl2.get_labels();
 	std::vector<int> fio_ndx;
 
 	int icl=1;
