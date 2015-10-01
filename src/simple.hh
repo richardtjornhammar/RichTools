@@ -51,7 +51,7 @@ namespace richanalysis {
 
 	class coord_format {
 		public:
-			void		mat2par( gmat*, gvec*, particles );
+			particles	mat2par( gmat*, gvec*);
 			// SHOULD IMPLEMENT ONE WICH RETURNS VECTOR OF PARTICLES ORDERED ON NDX (BELOW)
 			particles	par2par( particles, std::vector<int> , int );
 			gmat		par2mat( particles );

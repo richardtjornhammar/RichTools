@@ -54,6 +54,8 @@ namespace richanalysis {
 		//! performs k-means clustering on the specified data
 			int gsl_kmeans( gmat *, gvec *, gmat *, gvec * );
 			int gsl_kmeans( gmat *, gvec *, gmat *, gvec *, ftyp );
+		//! performs my own connectivity clustering algorithm
+			int connectivity( gmat * , ftyp val );
 	};
 
 	class cluster : public clustering, public linalg, public tensorIO {
@@ -111,9 +113,9 @@ namespace richanalysis {
 		int bPCset_;
 	};
 
-	class node_indices : public fitting {
+	class cluster_node : public fitting {
 		public:
-			node_indices() { bDirRel_=0; bUtSet_=0; 
+			cluster_node() { bDirRel_=0; bUtSet_=0; 
 					U_  = gsl_matrix_calloc( DIM, DIM );  t_ = gsl_vector_calloc( DIM ); 
 					iU_ = gsl_matrix_calloc( DIM, DIM ); it_ = gsl_vector_calloc( DIM ); sgn_=1; }
 
@@ -129,6 +131,7 @@ namespace richanalysis {
 			void			printUt(void){  output_matrix(U_); output_vector(t_); };
 			void			printiUt(void){ output_matrix(iU_);output_vector(it_);};
 			ftyp			angle_between(cluster c1, cluster c2);
+			std::pair<ftyp, ftyp >	angle_between(cluster c1, cluster c2, int i, int j);
 		private:
 			int bDirRel_;
 			std::vector<int> idx_;

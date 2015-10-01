@@ -328,11 +328,11 @@ fileIO::output_pdb( std::string filename, gmat *M, gvec *w ) {
 			zZ=(n==DIM)?(gsl_matrix_get(M,ZZ,i)):(gsl_matrix_get(M,i,ZZ));
 
 			outp_coord << std::right<< std::setw(6) << "HETATM" << std::setw(5) << i+1 << std::setw(3)
-				<< 'C'	<< std::setw(6) << "LIG" << std::setw(2) << ( (char) (65+round(gsl_vector_get(w,i))) )
+				<< 'H'	<< std::setw(6) << "LIG" << std::setw(2) << ( (char) (65+round(gsl_vector_get(w,i))) )
 				<< std::setw(4) << 1  << "    "	<< std::setprecision(4) 
 				<< std::setw(8) << xX << std::setw(8) << yY << std::setw(8) << zZ 
 				<< std::setprecision(3) << std::setw(6) << 1.00 
-				<< std::setw(6) << 0.00 << std::setw(12) << 'C' << std::endl;
+				<< std::setw(6) << 0.00 << std::setw(12) << 'H' << std::endl;
 		}
 	}
 	outp_coord << fin1 << fins.str() << std::endl;

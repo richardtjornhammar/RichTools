@@ -68,16 +68,44 @@ int outp_distance_matrix(gmat *A, ftyp level) {
 	if( A->size1 == A->size2 ) {
 		std::cout << " A(" << D << "," << D << ")=[" << std::endl; 
 		for(int i=0; i<D; i++){
+			ftyp sum=0,sumb=0;
+			for(int j=0;j<D;j++){
+				ftyp val=gsl_matrix_get(A,i,j);
+				ftyp valb=0;
+				if(level!=0) {
+					if(level>0) {
+						valb=val<level;
+					}else{
+						valb=val>sqrt(level*level);
+					}
+				}
+				if(valb>0)
+					std::cout << "\033[1;31m " << valb <<"\033[0m";
+				else
+					std::cout << " " << valb ;
+				val*=valb;
+				if(i!=j){
+					sum  += val;
+					sumb +=valb;
+				}
+			}
+			std::cout << " | " << sumb << " | " << sum << std::endl;
+		}
+		std::cout << "];" << std::endl;
+	}
+	return 0;
+}
+
+
+int outp_distance_matrix(gmat *A) {
+	int D = A->size1;
+	if( A->size1 == A->size2 ) {
+		std::cout << " A(" << D << "," << D << ")=[" << std::endl; 
+		for(int i=0; i<D; i++){
 			ftyp sum=0;
 			for(int j=0;j<D;j++){
 				ftyp val=gsl_matrix_get(A,i,j);
-				if(level!=0) {
-					if(level>0) {
-						val=val<level;
-					}else{
-						val=val>sqrt(level*level);
-					}
-				}
+
 				if(val>0)
 					std::cout << "\033[1;31m " << val <<"\033[0m";
 				else
@@ -91,6 +119,7 @@ int outp_distance_matrix(gmat *A, ftyp level) {
 	}
 	return 0;
 }
+
 
 std::vector<int > find_via_distance( gmat *A, ftyp level ) {
 	int D = A->size1;
@@ -178,7 +207,9 @@ int main (int argc, char **argv) {
 	richanalysis::cluster cl1, cl2, cl_test_d, cl_test_m;
 
 	cl1.alloc_space(D,N); 
+
 	cl2.alloc_space(B,N);
+
 
 	cl1.set_matrix( coord_space ); 	
 	cl2.set_matrix( carth_space );
@@ -187,13 +218,31 @@ int main (int argc, char **argv) {
 	cl2.perform_clustering();
 	std::vector<int> den_ndx = cl1.get_labels();
 	std::vector<int> crd_ndx = cl2.get_labels();
-
+	
+	richanalysis::coord_format cftool;
 	if(!bFit){
 // NCULSTS 1/12 with H 1/8 without
 		fIO.output_pdb("mod-nofit-n"+ns+".pdb", carth_space , crd_ndx);
-		richanalysis::node_indices mod_rel;
+		fIO.output_pdb("den-nofit-n"+ns+".pdb", coord_space , den_ndx);
 
-		int M=N;
+		gsl_matrix *C = gsl_matrix_alloc(DIM,N);
+		gsl_vector *w = gsl_vector_alloc(N);
+		if(1)
+			cl1.copyC(C); // the centroids are unordered
+		else
+			cl2.copyM(C);
+		cl1.copyw(w);
+		
+		particles centroids = cftool.mat2par(C,w);
+		gmat *dM = gsl_matrix_calloc(N,N);
+		std::cout << "INFO" << centroids.size()<<std::endl;
+		calc_distance_matrix(dM, centroids);
+		outp_distance_matrix(dM, 1.39); //1.39 sqrt(3)*1.39 2*1.39
+		cl1.connectivity(dM,1.39);
+
+		fIO.output_pdb("cen-nofit-n"+ns+".pdb", C , w);
+
+		richanalysis::cluster_node mod_rel;
 		std::vector<richanalysis::cluster > vmode;
 		for( int ipart=0;ipart<N;ipart++){
 			richanalysis::coord_format cf;
@@ -201,23 +250,33 @@ int main (int argc, char **argv) {
 			px	= cf.par2par(carth_space, crd_ndx, ipart);
 			D	= px.size();
 			richanalysis::cluster clpx;
-			if( D<M )
-				M=D;
-			clpx.alloc_space( D, 3 );
-			clpx.set_matrix( px );
+			std::cout << "INFO " << D << " " << N << std::endl;
+			if( D < N )
+				N = D;
+			clpx.alloc_space( D, N );
+			clpx.set_matrix ( px );
 			clpx.perform_clustering();
 			clpx.find_shape();
 			vmode.push_back(clpx);
 		}
 
 		for(int i=0;i<vmode.size()-1;i++){
-			mod_rel.angle_between(vmode[i],vmode[i+1]);
+			ftyp dist=1E4,angle=0.0;
+			int I,J;
+			for(int j=i+1;j<vmode.size();j++){
+				std::pair<ftyp,ftyp > angle_distance = mod_rel.angle_between(vmode[i],vmode[j],i,j);
+				if(angle_distance.second<dist&&angle_distance.second>0){
+					dist=angle_distance.second;angle=angle_distance.first;
+					I=i;J=j;
+				}
+			}
+			std::cout << "CLUSTER ("<< ((char)(I+65)) << "," << ((char)(J+65)) << ") " << angle << "\t" <<angle+180.0 << "\t\t" << dist << std::endl;
 		}
 		return (0);
 	}
 
 	int isw = 0;
-	richanalysis::node_indices nidx;
+	richanalysis::cluster_node nidx;
 
 	ftyp rmsd = 0.0;
 	rmsd = nidx.find_centroid_relation(cl1,cl2);
@@ -257,9 +316,10 @@ int main (int argc, char **argv) {
 		clpx.find_shape();
 		vmode.push_back(clpx);
 	}
-	richanalysis::node_indices mrel;
+	richanalysis::cluster_node mrel;
 	for(int i=0;i<vmode.size()-1;i++){
-		mrel.angle_between(vmode[i],vmode[i+1]);
+		for(int j=i+1;j<vmode.size();j++)
+			std::pair<ftyp,ftyp > angle_distance = mrel.angle_between(vmode[i],vmode[j],i,j);
 	}
 	fIO.output_pdb("mod"+ns+".pdb", align_space, fio_ndx);
 
@@ -291,7 +351,7 @@ int main (int argc, char **argv) {
 		cldx.find_shape();
 		vclus.push_back(cldx);
 	
-		richanalysis::node_indices cidx;
+		richanalysis::cluster_node cidx;
 
 		if(isw) //WE ARE ALREADY IN CORRECT CENTROID SO JUST SHAPEFIT
 			rmsd = cidx.find_shape_trans(cldx,clpx);
@@ -305,9 +365,10 @@ int main (int argc, char **argv) {
 	}
 	fIO.output_pdb("frag"+ns+".pdb", pfrag , ord_ndx );
 
-	richanalysis::node_indices crel;
+	richanalysis::cluster_node crel;
 	for(int i=0;i<vclus.size()-1;i++){
-		crel.angle_between(vclus[i],vclus[i+1]);
+		for(int j=i+1;j<vclus.size();j++)
+			std::pair<ftyp,ftyp > angle_distance = crel.angle_between(vclus[i],vclus[j],i,j);
 	}
 	for(int i=0;i<vclus.size();i++){
 		coord_space.push_back(vclus[i].normal());

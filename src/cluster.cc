@@ -50,6 +50,7 @@ void
 cluster::alloc_space( int D1, int D2 ) {
 //D1	COORDINATE	SPACE
 //D2	CENTROID	SPACE
+	std::cout << "INFOINFO"<< D1 << " " << D2 << " "<<DIM<<std::endl;
 	if(D1>=D2){
 		M_= gsl_matrix_calloc( DIM, D1 );
 		bSet_[0] = 1;
@@ -150,6 +151,75 @@ cluster::set_matrix( particles coord_space ) {
 }
 
 int 
+clustering::connectivity(gsl_matrix *B, ftyp val) {
+	int i,j,k,q,N,C=0,min;
+
+	int nr_sq=B->size1;
+	if(B->size1!=B->size2)
+		return(-1);
+
+	std::vector<int>	res;
+	std::vector<int>	nvisi;
+
+	std::vector<int>	s;
+	std::vector<int>	NN;
+	std::vector<int>	ndx;
+
+	N=nr_sq;
+	res.push_back(0);
+	for(i=0; i<N; i++ ){
+   		nvisi.push_back(i+1);
+		res.push_back(0);res.push_back(0);
+		ndx.push_back(i);
+	}
+
+	while(!ndx.empty()){
+		i=ndx.back(); ndx.pop_back(); 
+		NN.clear();
+
+		if(nvisi[i]>0){
+			C--;
+			for(j=0;j<N;j++){
+				if( gsl_matrix_get(B,j,i)<val==1 ) {
+					NN.push_back(j);
+				}
+			}
+			while(!NN.empty()){
+				k=NN.back(); NN.pop_back();
+				nvisi[k]=C;
+				for(j=0;j<N;j++){
+	   				if( gsl_matrix_get(B,j,k)<val==1 ){
+	     					for(q=0;q<N;q++){
+							if(nvisi[q]==j+1){
+								NN.push_back(q);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+   
+	std::cout <<"INFO " << C << "\ncluster data:\n";
+	std::vector<int> Nc; // NUMBER OF POINTS IN EACH CLUSTER
+	for(i=0;i<-1*C;i++)
+		Nc.push_back(0);
+
+	for(q=0;q<N;q++){
+		res[q*2+1]=q;
+		res[q*2]=nvisi[q]-C;
+		Nc[res[q*2]]++;
+		std::cout << " " << res[q*2] << " " << res[2*q+1] << std::endl ;
+   	}
+	// HOW MANY IN EACH?
+	for(i=0;i<-1*C;i++)
+		std::cout << "CLUSTER " << i << " HAS " << Nc[i] << " ELEMENTS" << std::endl ;
+
+	return(0);   
+}
+
+
+int 
 clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw ){
 	int NN=dat->size2, MM=dat->size1, KK=cent->size2;
 
@@ -162,7 +232,7 @@ clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw ){
 	gsl_vector_set_zero(nw);
 
 	int h, i, j;
-	ftyp old_error, error = 1E30, TOL=1E-4; 
+	ftyp old_error, error = 1E30, TOL=1E-20; 
 
 	std::vector<int> myvector;
 	for (i=0; i<NN; ++i) myvector.push_back(i); 
@@ -301,7 +371,7 @@ clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw, fty
 }
 
 particles 
-node_indices::apply_rot_trans( particles px , int I){
+cluster_node::apply_rot_trans( particles px , int I){
 	if(bUtSet_){
 		if(I>=0)
 			apply_fit( px, U_, t_	);
@@ -312,7 +382,7 @@ node_indices::apply_rot_trans( particles px , int I){
 }
 
 particles 
-node_indices::apply_rot_trans( particles px ){
+cluster_node::apply_rot_trans( particles px ){
 	if(bUtSet_){
 		if(sgn_>=0)
 			apply_fit( px, U_, t_	);
@@ -323,7 +393,7 @@ node_indices::apply_rot_trans( particles px ){
 }
 
 void
-node_indices::invert_transform( void ){
+cluster_node::invert_transform( void ){
 	if( iU_->size1==U_->size1 && iU_->size2==U_->size2 && t_->size==it_->size){
 		invert_matrix(U_,iU_);
 		gsl_blas_dgemv(CblasNoTrans, -1.0, iU_, t_, 0.0, it_);
@@ -331,7 +401,7 @@ node_indices::invert_transform( void ){
 }
 
 ftyp
-node_indices::find_centroid_relation(cluster c1, cluster c2){
+cluster_node::find_centroid_relation(cluster c1, cluster c2){
 	ftyp min_rmsd	= 1.0E10;
 
 	int N = c1.length_C();
@@ -411,7 +481,7 @@ node_indices::find_centroid_relation(cluster c1, cluster c2){
 ftyp
 node_indices::find_shape_relation( cluster c1, cluster c2 ){
 	ftyp min_rmsd	= 1.0E10;
-////	IS THE NUMBER OF CLUSTERS
+////	IS THE NUMBER OF CLUSTER S
 	int N 		= c1.length_C();
 	int dN 		= c1.length_M();
 	gmat *M01	= gsl_matrix_calloc( DIM, dN );
@@ -616,7 +686,7 @@ cluster::center( void ){
 }
 
 ftyp			
-node_indices::angle_between(cluster c1, cluster c2){
+cluster_node::angle_between(cluster c1, cluster c2){
 
 	if( c1.has_shape() && c2.has_shape() ){
 		ftyp a,b,c,x,y,z;
@@ -653,11 +723,57 @@ node_indices::angle_between(cluster c1, cluster c2){
 	}else{
 		return -1000.0;
 	}
-
 }
 
+
+std::pair<ftyp,ftyp >			
+cluster_node::angle_between(cluster c1, cluster c2, int I, int J){
+
+	std::pair<ftyp,ftyp > ang_dist;
+
+	if( c1.has_shape() && c2.has_shape() ){
+		ftyp a,b,c,x,y,z;
+		gmat *Uc1 = gsl_matrix_calloc(DIM,DIM);
+		gmat *Uc2 = gsl_matrix_calloc(DIM,DIM);
+		gvec *tc1 = gsl_vector_calloc(DIM);
+		gvec *tc2 = gsl_vector_calloc(DIM);
+		c1.copyUc(Uc1);
+		c2.copyUc(Uc2);
+		c1.copytc(tc1);
+		c2.copytc(tc2);
+		gsl_vector_sub(tc1,tc2);
+		{ 
+			a = gsl_matrix_get(Uc1,XX,ZZ); 
+			b = gsl_matrix_get(Uc1,YY,ZZ); 
+			c = gsl_matrix_get(Uc1,ZZ,ZZ);
+
+			x = gsl_matrix_get(Uc2,XX,ZZ); 
+			y = gsl_matrix_get(Uc2,YY,ZZ); 
+			z = gsl_matrix_get(Uc2,ZZ,ZZ);
+
+			ftyp dx = gsl_vector_get(tc1,XX);
+			ftyp dy = gsl_vector_get(tc1,YY);
+			ftyp dz = gsl_vector_get(tc1,ZZ);
+
+			ftyp dlen0=1.0/sqrt(dx*dx+dy*dy+dz*dz);
+			ftyp ilen1=1.0/sqrt(a*a+b*b+c*c);
+			ftyp ilen2=1.0/sqrt(x*x+y*y+z*z);
+
+			ftyp angle	= atan2( (dx*(b*z-c*y)+dy*(c*x-a*z)+dz*(a*y-b*x))*dlen0*ilen1*ilen2 , (a*x+b*y+c*z)*ilen1*ilen2 );
+			ang_dist.first	= angle*180.0/M_PI;
+			ang_dist.second	= 1.0/dlen0;
+		}
+		gsl_vector_free(tc1); gsl_vector_free(tc2);
+		gsl_matrix_free(Uc1); gsl_matrix_free(Uc2);
+	}else{
+		ang_dist.first=0.0; ang_dist.second=-1.0;
+	}
+	return ang_dist;
+}
+
+
 ftyp
-node_indices::find_shape_trans( cluster c1, cluster c2 ){
+cluster_node::find_shape_trans( cluster c1, cluster c2 ){
 //	Do a single shape fit
 
 	int N = c1.length_M();
