@@ -435,7 +435,7 @@ fitting::kabsch_fit(	gsl_matrix *P, gsl_matrix *Q,			// IN
 	gsl_blas_dgemm(CblasNoTrans,CblasTrans, 1.0, W, V, 0.0, C);
 	double det = get_det(C);
 	if (det < 0){	// FLIP IT!
-		gsl_matrix_set(EYE,ZZ,ZZ,-1);
+		gsl_matrix_set(EYE,ZZ,ZZ,-1); //gsl_matrix_set(EYE,XX,XX,-1); //gsl_matrix_set(EYE,ZZ,ZZ,-1);
 		gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, V, 0.0, TMP);
 		gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, W, TMP, 0.0, C);
 	}

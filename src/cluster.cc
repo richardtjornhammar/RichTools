@@ -232,7 +232,7 @@ clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw ){
 	gsl_vector_set_zero(nw);
 
 	int h, i, j;
-	ftyp old_error, error = 1E30, TOL=1E-20; 
+	ftyp old_error, error = 1E30, TOL=1E-8; 
 
 	std::vector<int> myvector;
 	for (i=0; i<NN; ++i) myvector.push_back(i); 

@@ -63,8 +63,10 @@ int calc_distance_matrix(gmat *A, particles coord_space) {
 	}
 }
 
-int outp_distance_matrix(gmat *A, ftyp level) {
+std::vector<int>
+outp_distance_matrix(gmat *A, ftyp level) {
 	int D = A->size1;
+	std::vector<int> vi;
 	if( A->size1 == A->size2 ) {
 		std::cout << " A(" << D << "," << D << ")=[" << std::endl; 
 		for(int i=0; i<D; i++){
@@ -89,13 +91,46 @@ int outp_distance_matrix(gmat *A, ftyp level) {
 					sumb +=valb;
 				}
 			}
+			vi.push_back(sumb);
 			std::cout << " | " << sumb << " | " << sum << std::endl;
 		}
 		std::cout << "];" << std::endl;
 	}
-	return 0;
+	return vi;
 }
 
+std::vector<int>
+compare_dist_matrices(gmat *A, gmat *B, ftyp val){
+
+	std::vector<int> vi;
+	if(A->size1==B->size1&&A->size2==B->size2&&A->size1==B->size2)
+	{
+		std::cout << "COMPARING..." << std::endl;
+		gvec *va = gsl_vector_calloc(A->size1);
+		gvec *vb = gsl_vector_calloc(B->size2);
+
+		for(int i=0;i<A->size1;i++) 
+		{
+			ftyp diff=1E10,dotp;
+			int I=0;
+			for(int j=0;j<B->size1;j++) 
+			{
+				gsl_matrix_get_row ( va, A, i );
+				gsl_matrix_get_row ( vb, B, j );
+				gsl_vector_sub(va,vb);
+				gsl_blas_ddot (va, va, &dotp);
+				if(dotp<diff)
+				{
+					I = j;
+					diff=dotp;
+				}
+			}
+			vi.push_back(I);
+		}
+	}
+
+	return vi;
+}
 
 int outp_distance_matrix(gmat *A) {
 	int D = A->size1;
@@ -207,9 +242,7 @@ int main (int argc, char **argv) {
 	richanalysis::cluster cl1, cl2, cl_test_d, cl_test_m;
 
 	cl1.alloc_space(D,N); 
-
 	cl2.alloc_space(B,N);
-
 
 	cl1.set_matrix( coord_space ); 	
 	cl2.set_matrix( carth_space );
@@ -220,6 +253,12 @@ int main (int argc, char **argv) {
 	std::vector<int> crd_ndx = cl2.get_labels();
 	
 	richanalysis::coord_format cftool;
+	std::vector<std::string > anames;
+	for(int i=0;i<N;i++)
+		anames.push_back("C");
+
+	std::vector<int> idx1,idx2;
+
 	if(!bFit){
 // NCULSTS 1/12 with H 1/8 without
 		fIO.output_pdb("mod-nofit-n"+ns+".pdb", carth_space , crd_ndx);
@@ -227,55 +266,49 @@ int main (int argc, char **argv) {
 
 		gsl_matrix *C = gsl_matrix_alloc(DIM,N);
 		gsl_vector *w = gsl_vector_alloc(N);
-		if(1)
-			cl1.copyC(C); // the centroids are unordered
-		else
-			cl2.copyM(C);
+		cl1.copyC(C); // the centroids are unordered
 		cl1.copyw(w);
 		
 		particles centroids = cftool.mat2par(C,w);
 		gmat *dM = gsl_matrix_calloc(N,N);
 		std::cout << "INFO" << centroids.size()<<std::endl;
 		calc_distance_matrix(dM, centroids);
-		outp_distance_matrix(dM, 1.39); //1.39 sqrt(3)*1.39 2*1.39
-		cl1.connectivity(dM,1.39);
+		idx1=outp_distance_matrix(dM, 1.4); // 1.39 sqrt(3)*1.39 2*1.39
+		cl1.connectivity(dM,1.4);
 
-		fIO.output_pdb("cen-nofit-n"+ns+".pdb", C , w);
-
-		richanalysis::cluster_node mod_rel;
-		std::vector<richanalysis::cluster > vmode;
-		for( int ipart=0;ipart<N;ipart++){
-			richanalysis::coord_format cf;
-			particles px;
-			px	= cf.par2par(carth_space, crd_ndx, ipart);
-			D	= px.size();
-			richanalysis::cluster clpx;
-			std::cout << "INFO " << D << " " << N << std::endl;
-			if( D < N )
-				N = D;
-			clpx.alloc_space( D, N );
-			clpx.set_matrix ( px );
-			clpx.perform_clustering();
-			clpx.find_shape();
-			vmode.push_back(clpx);
+		if(N==B){
+			gsl_matrix *M = gsl_matrix_alloc(DIM,B);
+			gsl_vector *v = gsl_vector_alloc(B);
+			cl2.copyM(M);
+			cl2.copyv(v);
+			particles centrs = cftool.mat2par(M,v);
+			gmat *dN = gsl_matrix_calloc(B,B);
+	
+			calc_distance_matrix(dN, centrs);
+			idx2=outp_distance_matrix(dN, 1.4);
+			cl2.connectivity(dN, 1.4);
 		}
-
-		for(int i=0;i<vmode.size()-1;i++){
-			ftyp dist=1E4,angle=0.0;
-			int I,J;
-			for(int j=i+1;j<vmode.size();j++){
-				std::pair<ftyp,ftyp > angle_distance = mod_rel.angle_between(vmode[i],vmode[j],i,j);
-				if(angle_distance.second<dist&&angle_distance.second>0){
-					dist=angle_distance.second;angle=angle_distance.first;
-					I=i;J=j;
-				}
-			}
-			std::cout << "CLUSTER ("<< ((char)(I+65)) << "," << ((char)(J+65)) << ") " << angle << "\t" <<angle+180.0 << "\t\t" << dist << std::endl;
+		std::cout << "IDX1 " << std::endl;
+		int sum=0;
+		for(int i=0;i<idx1.size();i++){
+			std::cout << " " << idx1[i] ;
+			sum+=idx1[i];
 		}
+		std::cout << "SUM " << sum << std::endl;
+		sum=0;
+		std::cout << "IDX2 " << std::endl;
+		for(int i=0;i<idx2.size();i++){
+			std::cout << " " << idx2[i] ;
+			sum+=idx2[i];
+		}
+		std::cout << "SUM " << sum << std::endl;
+		std::cout << std::endl;
+		fIO.output_pdb("cen-nofit-n"+ns+".pdb", C , anames);
+
 		return (0);
 	}
 
-	int isw = 0;
+	int isw = 1;
 	richanalysis::cluster_node nidx;
 
 	ftyp rmsd = 0.0;
@@ -319,7 +352,8 @@ int main (int argc, char **argv) {
 	richanalysis::cluster_node mrel;
 	for(int i=0;i<vmode.size()-1;i++){
 		for(int j=i+1;j<vmode.size();j++)
-			std::pair<ftyp,ftyp > angle_distance = mrel.angle_between(vmode[i],vmode[j],i,j);
+			std::pair<ftyp,ftyp > angle_distance = 
+				mrel.angle_between(vmode[i],vmode[j],i,j);
 	}
 	fIO.output_pdb("mod"+ns+".pdb", align_space, fio_ndx);
 
@@ -368,7 +402,8 @@ int main (int argc, char **argv) {
 	richanalysis::cluster_node crel;
 	for(int i=0;i<vclus.size()-1;i++){
 		for(int j=i+1;j<vclus.size();j++)
-			std::pair<ftyp,ftyp > angle_distance = crel.angle_between(vclus[i],vclus[j],i,j);
+			std::pair<ftyp,ftyp > angle_distance = 
+				crel.angle_between(vclus[i],vclus[j],i,j);
 	}
 	for(int i=0;i<vclus.size();i++){
 		coord_space.push_back(vclus[i].normal());

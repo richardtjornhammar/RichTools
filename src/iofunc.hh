@@ -77,6 +77,7 @@ namespace richanalysis {
 			void output_pdb( std::string filename, particles px, std::vector<int> ndx, std::string label );
 			void output_pdb( std::string filename, particles px );
 			void output_pdb( std::string filename, gmat *M	, gvec *v);
+			void output_pdb( std::string filename, gmat *M	, std::vector<std::string > anams);
 	};
 
 }
