@@ -75,6 +75,29 @@ coord_format::mat2par( gmat* M, gvec* w) {
 }
 
 particles
+coord_format::truncmat( gmat* M, gvec* w, int I) {
+	particles px;
+	if( M->size1==DIM ){
+		gsl_vector *v = gsl_vector_calloc(DIM);
+		for(int i=0;i<M->size2;i++){
+			if( I == ((int)(gsl_vector_get(w,i))) ) {
+				gsl_matrix_get_col ( v, M, i);
+	
+				particle p;
+				p.second = gsl_vector_calloc(DIM);
+	
+				gsl_vector_memcpy(p.second,v);
+				p.first = std::to_string(gsl_vector_get(w,i));
+				px.push_back(p);
+			}
+		}
+	}else{
+		std::cout << "ERROR::MAT2PAR" << std::endl;
+	}
+	return px;
+}
+
+particles
 coord_format::par2par( particles ipx, std::vector<int> ndx, int I ) {
 	particles opx;
 	if(ipx.size()==ndx.size()){

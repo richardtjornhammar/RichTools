@@ -56,7 +56,6 @@ namespace richanalysis {
 			particles	par2par( particles, std::vector<int> , int );
 			gmat		par2mat( particles );
 			particles	app_par( particles , particles );
-			particles	truncmat( gmat* , gvec*, int );
 	};
 }
 #endif

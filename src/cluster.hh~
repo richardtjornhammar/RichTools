@@ -125,7 +125,7 @@ namespace richanalysis {
 
 			ftyp			find_centroid_relation( cluster c1, cluster c2 );
 
-			std::vector<int>	find_simple_relation( void );
+			std::vector<int>	find_shape_relation( void );
 
 			ftyp			find_shape_trans( cluster c1, cluster c2 );
 

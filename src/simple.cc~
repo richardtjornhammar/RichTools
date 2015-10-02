@@ -1,4 +1,4 @@
-/*	simple.hh	*/
+/*	simple.cc	*/
 //C Copyright (C) 2015 Richard Tjörnhammar
 //L
 //L  This library is free software and is distributed under the terms
@@ -38,25 +38,84 @@
 //L  The GNU Lesser General Public can also be obtained by writing to the
 //L  Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
 //L  MA 02111-1307 USA
-#ifndef SIMPLE_H
-#define SIMPLE_H
-namespace richanalysis {
 
-	class simple_ops {
-		public:
-			ftyp square( ftyp x ) { return x*x; }
-			ftyp abs( ftyp x ) { return (x>0)?(x):(-1*x); }
-			std::vector<std::vector<int> > all_permutations(std::vector<int> v);
-	};
+#include "richtypes.h"
+#include "simple.hh"
+#include <iostream>
+#include <algorithm>
 
-	class coord_format {
-		public:
-			particles	mat2par( gmat*, gvec*);
-			// SHOULD IMPLEMENT ONE WICH RETURNS VECTOR OF PARTICLES ORDERED ON NDX (BELOW)
-			particles	par2par( particles, std::vector<int> , int );
-			gmat		par2mat( particles );
-			particles	app_par( particles , particles );
-			particles	truncmat( gmat* , gvec*, int );
-	};
+using namespace richanalysis;
+
+std::vector<std::vector<int> > 
+simple_ops::all_permutations(std::vector<int> v) {
+	std::vector<std::vector<int> > mv;
+	do { mv.push_back(v) ; } while (std::next_permutation(v.begin(), v.end()));
+	return mv;
 }
-#endif
+
+particles
+coord_format::mat2par( gmat* M, gvec* w) {
+	particles px;
+	if( M->size1==DIM ){
+		gsl_vector *v = gsl_vector_calloc(DIM);
+		for(int i=0;i<M->size2;i++){
+			gsl_matrix_get_col ( v, M, i);
+
+			particle p;
+			p.second = gsl_vector_calloc(DIM);
+
+			gsl_vector_memcpy(p.second,v);
+			p.first = std::to_string(gsl_vector_get(w,i));
+			px.push_back(p);
+		}
+	}else{
+		std::cout << "ERROR::MAT2PAR" << std::endl;
+	}
+	return px;
+}
+
+particles
+coord_format::mat2par( gmat* M, gvec* w, int I) {
+	particles px;
+	if( M->size1==DIM ){
+		gsl_vector *v = gsl_vector_calloc(DIM);
+		for(int i=0;i<M->size2;i++){
+			if( I == ((int)(gsl_vector_get(w,i))) ) {
+				gsl_matrix_get_col ( v, M, i);
+	
+				particle p;
+				p.second = gsl_vector_calloc(DIM);
+	
+				gsl_vector_memcpy(p.second,v);
+				p.first = std::to_string(gsl_vector_get(w,i));
+				px.push_back(p);
+			}
+		}
+	}else{
+		std::cout << "ERROR::MAT2PAR" << std::endl;
+	}
+	return px;
+}
+
+particles
+coord_format::par2par( particles ipx, std::vector<int> ndx, int I ) {
+	particles opx;
+	if(ipx.size()==ndx.size()){
+		for(int i=0;i<ipx.size();i++){
+			if(ndx[i]==I){
+				opx.push_back(ipx[i]);
+			}
+		}
+		return opx;
+	}else{
+		std::cout << "ERROR::PAR2PAR" << std::endl;
+	}
+}
+
+particles
+coord_format::app_par( particles ipx, particles opx ) {
+	for(int i=0;i<ipx.size();i++){
+		opx.push_back(ipx[i]);
+	}
+	return opx;
+}

@@ -327,7 +327,7 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 	gsl_blas_dgemm(CblasNoTrans,CblasTrans, 1.0, W1, W2, 0.0, C);
 	ftyp det = get_det(C);
 
-	int JJ=(det<0)?4:0;
+	int JJ=(det>0)?4:0;
 	for(int II=JJ;II<(JJ+4);II++)
 //	for(int II=0;II<8;II++)
 	{

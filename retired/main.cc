@@ -259,10 +259,11 @@ int main (int argc, char **argv) {
 
 	std::vector<int> idx1,idx2;
 
-	fIO.output_pdb("mod-nofit-n"+ns+".pdb", carth_space , crd_ndx);
-	fIO.output_pdb("den-nofit-n"+ns+".pdb", coord_space , den_ndx);
 	if(!bFit){
 // NCULSTS 1/12 with H 1/8 without
+		fIO.output_pdb("mod-nofit-n"+ns+".pdb", carth_space , crd_ndx);
+		fIO.output_pdb("den-nofit-n"+ns+".pdb", coord_space , den_ndx);
+
 		gsl_matrix *C = gsl_matrix_alloc(DIM,N);
 		gsl_vector *w = gsl_vector_alloc(N);
 		cl1.copyC(C); // the centroids are unordered
@@ -307,15 +308,12 @@ int main (int argc, char **argv) {
 		return (0);
 	}
 
-	int isw = 0;
-
+	int isw = 1;
 	richanalysis::cluster_node nidx;
 
-	nidx.assign_sub(cl2,cl1);
-	nidx.find_simple_relation();
-/*
 	ftyp rmsd = 0.0;
 	rmsd = nidx.find_centroid_relation(cl1,cl2);
+	std::cout << ":INFO:RMSD:" << std::endl << rmsd << std::endl;	
 
 	std::vector<int> rel_ndx = nidx.get_indices();
 	std::vector<int> fio_ndx;
@@ -337,7 +335,6 @@ int main (int argc, char **argv) {
 
 	int M=N;
 	std::vector<richanalysis::cluster > vmode;
-
 	for( int ipart=0;ipart<N;ipart++){
 		richanalysis::coord_format cf;
 		particles px;
@@ -390,9 +387,9 @@ int main (int argc, char **argv) {
 	
 		richanalysis::cluster_node cidx;
 
-//		if(isw) //WE ARE ALREADY IN CORRECT CENTROID SO JUST SHAPEFIT
-//			rmsd = cidx.find_shape_relation(cldx,clpx);
-//		else
+		if(isw) //WE ARE ALREADY IN CORRECT CENTROID SO JUST SHAPEFIT
+			rmsd = cidx.find_shape_relation(cldx,clpx);
+		else
 			rmsd = cidx.find_centroid_relation(cldx,clpx);
 
 		rtx=cidx.apply_rot_trans( px );
@@ -411,12 +408,11 @@ int main (int argc, char **argv) {
 	for(int i=0;i<vclus.size();i++){
 		coord_space.push_back(vclus[i].normal());
 		coord_space.push_back(vclus[i].center());
-		den_ndx.push_back(i); den_ndx.push_back(i);
+		den_ndx.push_back(i);den_ndx.push_back(i);
 	}
-
 //	THIS IS THE DENSITY WE ARE FITTING TO
 	std::string alabel("H");
 	fIO.output_pdb("dens"+ns+".pdb", coord_space , den_ndx , alabel);
-*/
+
 	return 0;
 }

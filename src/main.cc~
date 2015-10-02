@@ -312,7 +312,7 @@ int main (int argc, char **argv) {
 	richanalysis::cluster_node nidx;
 
 	nidx.assign_sub(cl2,cl1);
-	nidx.find_simple_relation();
+	nidx.find_shape_relation();
 /*
 	ftyp rmsd = 0.0;
 	rmsd = nidx.find_centroid_relation(cl1,cl2);
