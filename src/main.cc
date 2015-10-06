@@ -261,6 +261,7 @@ int main (int argc, char **argv) {
 
 	fIO.output_pdb("mod-nofit-n"+ns+".pdb", carth_space , crd_ndx);
 	fIO.output_pdb("den-nofit-n"+ns+".pdb", coord_space , den_ndx);
+
 	if(!bFit){
 // NCULSTS 1/12 with H 1/8 without
 		gsl_matrix *C = gsl_matrix_alloc(DIM,N);
@@ -312,7 +313,13 @@ int main (int argc, char **argv) {
 	richanalysis::cluster_node nidx;
 
 	nidx.assign_sub(cl2,cl1);
-	nidx.find_simple_relation();
+	std::vector<int> fio_ndx, rel_ndx = nidx.find_centroid_relation();
+	particles align_space = nidx.apply_rot_trans( carth_space );
+	for(int i=0; i<crd_ndx.size(); i++) {
+		fio_ndx.push_back( rel_ndx[crd_ndx[i]] );
+	}
+	fIO.output_pdb("color-rel-n"+ns+".pdb", align_space , fio_ndx);
+
 /*
 	ftyp rmsd = 0.0;
 	rmsd = nidx.find_centroid_relation(cl1,cl2);
@@ -327,10 +334,7 @@ int main (int argc, char **argv) {
 		nden += den_ndx[i]==icl?1:0;
 	}
 
-	for(int i=0; i<crd_ndx.size(); i++) {
-		fio_ndx.push_back( rel_ndx[crd_ndx[i]] );
-		nmod += rel_ndx[crd_ndx[i]]==icl?1:0;
-	}
+
 
 	particles align_space;
 	align_space = nidx.apply_rot_trans( carth_space );

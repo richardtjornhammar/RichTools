@@ -372,69 +372,68 @@ clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw, fty
 
 std::vector<int>			
 cluster_node::find_simple_relation( void ){
-	std::vector<int> residx;
-	if(!subSet()){
+	std::vector<std::pair<int,int > > residx;
+	std::vector<int> idx, sidx;
+	std::vector<ftyp > rmsds;
+
+	if(!subSet()) {
 		std::cout << "INFO::SUBNOTSET::" << std::endl;
-		return residx;
+		return idx;
 	}
 	int N = vc1_.size();
 	int M = vc2_.size();
 	std::cout << "INFO:: HAVE SUBCLUSTERS OF SIZE::" << N << " AND " << M << std::endl;
-	int Lt[2]={0,0};
-	std::vector<int> unassigned;
-	for(int i=0;i<N;i++)
-	{
-		Lt[0]+=vc1_[i].length_M();
+	if(N!=M) {
+		return idx;
 	}
 
-	for(int j=0;j<M;j++)
-	{
-		Lt[1]+=vc2_[j].length_M();
-		unassigned.push_back(j);
-	}
 	for(int i=0;i<N;i++) {
-		ftyp rmsd=1E10;
-		ftyp frac0=(float)vc1_[i].length_M()/(float)Lt[0];
-		int J=-1,JJ=-1;
-		for(int j=0;j<unassigned.size();j++) {
-			J=unassigned[j];
-			ftyp val=square(frac0-(float)vc2_[J].length_M()/(float)Lt[1]);
-			if(rmsd>val)
-			{
-				JJ=J;
-				rmsd=val;
+	double rmsd0=100.0;
+	for(int j=0;j<M;j++) {
+		gmat *P = gsl_matrix_calloc(DIM,vc1_[i].length_M());
+		vc1_[i].copyM(P);
+		gmat *Q = gsl_matrix_calloc(DIM,vc2_[j].length_M());
+		vc2_[j].copyM(Q);
+		gmat *U = gsl_matrix_calloc(DIM,DIM);
+		gvec *t = gsl_vector_calloc(DIM);
+
+		ftyp rmsd=shape_fit( P, Q, U, t, 2);
+//
+		std::cout << "INFO::"<< "HAVE::RMSD::" << rmsd << " i " << i << " j " << j 
+			<< " L1 " << P->size2 << " L2 " << Q->size2 << std::endl;
+//
+		std::pair<int,int> pi;
+		pi.first=i; pi.second=j;
+		rmsds.push_back(rmsd);
+		residx.push_back(pi);
+	}
+	}
+
+	idx.push_back(-1); idx.push_back(-1); idx.push_back(-1);
+	sidx.push_back(-1); sidx.push_back(-1); sidx.push_back(-1);
+	while( N>0 ) {
+		ftyp rms	= 1E10; int J=0;
+		for(int i=0;i<residx.size();i++){
+			if( rms>rmsds[i] ) {
+				rms=rmsds[i];
+				J	= i;
 			}
 		}
-		residx.push_back(JJ);
-		if(residx.size()<N)
-			unassigned.erase(unassigned.begin()+JJ);
-	}
-/*
-			gmat *P = gsl_matrix_calloc(DIM,vc1_[i].length_M());
-			vc1_[i].copyM(P);
-			gmat *Q = gsl_matrix_calloc(DIM,vc2_[j].length_M());
-			vc2_[j].copyM(Q);
-			gmat *U = gsl_matrix_calloc(DIM,DIM);
-			gvec *t = gsl_vector_calloc(DIM);
-
-			double rmsd=shape_fit( P, Q, U, t );
-			std::cout << "INFO::HAVE::RMSD::" << rmsd << " i " << i << " j " << j 
-				<< " L1 " << vc1_[i].length_M() << " L2 " << vc2_[j].length_M() << std::endl;
-			if( rmsd<rmsd0 ) {
-				rmsd0=rmsd;
-				if(residx.size()==i+1){
-					residx[i]=j;
-				}else{
-					residx.push_back(j);
-				}
-			}
-
+		rmsds[J]=1E10;
+		if( idx[residx[J].first]==-1 && sidx[residx[J].second]==-1 ){ // 
+			idx[residx[J].first]=residx[J].second;
+			sidx[residx[J].second]=residx[J].first;
+			N--;
 		}
 	}
-*/	std::cout << "INFO::HAVE::N_IDX::" << residx.size() << std::endl;
-	for(int i=0;i<residx.size();i++)
-		std::cout << "INFO:: " << residx[i] << std::endl;
-	
+	std::cout << "INFO::HAVE::N_IDX::" << idx.size() << std::endl;
+
+	idx_.clear();
+	for(int i=0;i<idx.size();i++){
+		idx_.push_back(idx[i]);
+		std::cout << "INFO:: " << idx[i] << std::endl;
+	}
+	return idx;
 }
 
 void
@@ -442,6 +441,8 @@ cluster_node::assign_sub( cluster c1, cluster c2 ) {
 
 	int N,M;
 	if(c1.isSet()&&c2.isSet()){
+		parents_.first  = c1;
+		parents_.second = c2;
 
 		N=c1.length_M();
 		M=c1.length_C();
@@ -511,9 +512,12 @@ cluster_node::invert_transform( void ){
 	}
 }
 
-ftyp
-cluster_node::find_centroid_relation(cluster c1, cluster c2){
+std::vector<int> 
+cluster_node::find_centroid_relation( void ){
 	ftyp min_rmsd	= 1.0E10;
+
+	cluster c1 = parents_.second;
+	cluster c2 = parents_.first;
 
 	int N = c1.length_C();
 
@@ -557,14 +561,14 @@ cluster_node::find_centroid_relation(cluster c1, cluster c2){
 		}
 	}
 
-	if(idx_.size()==0) { 
-		for(int i=0;i<iv.size();i++) // THIS IS WHAT WE WANTED
-			idx_.push_back(imv[J][i]);
-	} else {
+	if(idx_.size()!=0) {
 		std::cout << "INFO::ERROR WITH IDX_" << std::endl;
 		idx_.clear();
-		for(int i=0;i<iv.size();i++)
-			idx_.push_back(imv[J][i]);
+	}
+
+	for(int i=0;i<iv.size();i++){
+		idx_.push_back(imv[J][i]);
+		iv[i]=imv[J][i];
 	}
 
 	bDirRel_=2*(c1.length_M()>c2.length_M())-1;
@@ -585,7 +589,7 @@ cluster_node::find_centroid_relation(cluster c1, cluster c2){
 	gsl_vector_free(t);
 	gsl_vector_free(gv);
 
-	return min_rmsd;
+	return iv;
 }
 
 ftyp
@@ -803,7 +807,7 @@ cluster_node::find_shape_trans( cluster c1, cluster c2 ){
 	gmat *U		= gsl_matrix_calloc( DIM, DIM );
 	gvec *t		= gsl_vector_calloc( DIM );
 
-	ftyp min_rmsd = shape_fit(MNT,MEN,U,t);
+	ftyp min_rmsd = shape_fit(MNT,MEN,U,t,1);
 
 	gsl_matrix_memcpy (U_, U);
 	gsl_vector_memcpy (t_, t);

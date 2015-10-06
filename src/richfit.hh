@@ -70,7 +70,7 @@ namespace richanalysis {
 					  		int II );
 		//! shape fitting
 			ftyp	shape_fit	(	gmat *P , gmat *Q ,	// IN
-					  		gmat *U , gvec *t );	// OUT 
+					  		gmat *U , gvec *t , int type);	// OUT 
 		//! model alignment
 			ftyp	kabsch_fit	(	gmat *P	, gmat *Q ,		// IN
 				  		 	gmat *U	, gvec *t );		// OUT

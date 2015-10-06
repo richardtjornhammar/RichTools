@@ -247,7 +247,7 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 
 ftyp 
 fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
-			gmat *U , gvec *t 	) {	
+			gmat *U , gvec *t , int type	) {	
 
 	if( !(	   P->size1 == Q->size1 
 		&& U->size1 == U->size2 && U->size1 == P->size1 
@@ -275,6 +275,11 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 
 	calc_centroid(P,w1,p0); center_matrix(P,p0);
 	calc_centroid(Q,w2,q0); center_matrix(Q,q0);
+	gsl_matrix *P_0 = gsl_matrix_alloc(P->size1,P->size2);
+	gsl_matrix *P_1 = gsl_matrix_alloc(P->size1,P->size2);
+	gsl_matrix *Q_0 = gsl_matrix_alloc(Q->size1,Q->size2);
+	gsl_matrix_memcpy( P_0, P );
+	gsl_matrix_memcpy( Q_0, Q );
 
 	gsl_matrix *w1P = gsl_matrix_alloc(P->size1,P->size2);
 	calc_vmprod( w1, P, w1P );
@@ -282,8 +287,10 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 	calc_vmprod( w2, Q, w2Q );
 
 	gsl_matrix *DIF = gsl_matrix_alloc( D, D );
-	gsl_matrix *sqP = gsl_matrix_alloc( D, D );
-	gsl_matrix *sqQ = gsl_matrix_alloc( D, D );
+	gsl_matrix *sqP = gsl_matrix_calloc( D, D );
+	gsl_matrix *sqQ = gsl_matrix_calloc( D, D );
+	gsl_matrix *sqP0 = gsl_matrix_calloc( D, D );
+	gsl_matrix *sqQ0 = gsl_matrix_calloc( D, D );
 
 	gsl_matrix *TMP = gsl_matrix_alloc( D, D );
 	gsl_matrix *C   = gsl_matrix_alloc( D, D );
@@ -318,7 +325,6 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 
 ////	ROTATION	FOR THE MODEL (Q)
 //	TAKE NOTE OF THE RESULTING SIGN ON U
-	ftyp rmsd=0.0, min_rmsd=1e10;
 	gsl_matrix *Ut = gsl_matrix_calloc( D, D );
 	gsl_vector *tt = gsl_vector_calloc( D );
 	gsl_matrix_memcpy( Ut , U );
@@ -327,13 +333,17 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 	gsl_blas_dgemm(CblasNoTrans,CblasTrans, 1.0, W1, W2, 0.0, C);
 	ftyp det = get_det(C);
 
-	int JJ=(det<0)?4:0;
-	for(int II=JJ;II<(JJ+4);II++)
-//	for(int II=0;II<8;II++)
+	ftyp rmsd	= 0.0 , min_rmsd	= 1e10;
+	ftyp total_rmsd	= 0.0 , total_min_rmsd	= 1e10;
+	ftyp xi 	= 1.0 , gau_norm 	= 1.0/sqrt(2.0*M_PI)/xi;
+	for(int II=0;II<8;II++)
 	{
-//		int II=JJ;
 		gsl_vector_memcpy(tt, p0);
 		gsl_matrix_set_identity( EYE );
+		gsl_matrix_memcpy( P_0, P );
+		gsl_matrix_memcpy( Q_0, Q );
+		gsl_matrix_memcpy( sqP0, sqP );
+		gsl_matrix_memcpy( sqQ0, sqQ );
 
 		switch(II){
 			case  0: break;
@@ -347,30 +357,51 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 			default: break;
 		}
 
-		gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, W2, 0.0, TMP ); // CblasNoTrans, CblasTrans
-		gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, W1, TMP, 0.0, C ); // CblasNoTrans, CblasNoTrans	
-		gsl_matrix_memcpy( Ut , C );
+		gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, W2, 0.0, TMP ); 
+		gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, W1, TMP, 0.0, C ); 	
 
+		gsl_matrix_memcpy( Ut , C );
 		gsl_blas_dgemv( CblasNoTrans, -1.0, Ut, q0, 1.0, tt );
 
-		gsl_matrix_memcpy( DIF, sqQ );
-		gsl_blas_dgemm(CblasNoTrans,CblasNoTrans, 1.0, Ut, sqP, -1.0, DIF);
+		if( type == 1 ) {
+			gsl_matrix_memcpy( DIF, sqQ0 );
+			gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, Ut, sqP0, -1.0, DIF);
+		
+			rmsd=0.0;
+			for( int i=0 ; i<DIM ; i++ ){
+				rmsd += (  square(gsl_matrix_get(DIF,XX,i))
+					 + square(gsl_matrix_get(DIF,YY,i))
+					 + square(gsl_matrix_get(DIF,ZZ,i)) );
+			}
+			rmsd /= cnt;
+			if( rmsd < min_rmsd ){
+				gsl_matrix_memcpy( U , Ut );
+				gsl_vector_memcpy( t , tt );
+				min_rmsd = rmsd;
+			}
+		}else {
+			gsl_blas_dgemm(CblasNoTrans,CblasNoTrans, 1.0, Ut, P_0, 0.0, P_1 );
+			ftyp tot_cnt=1.0;	
+			for(int i=0;i<P_0->size2;i++) {
+				for(int j=0;j<Q_0->size2;j++) {
+					double x2	= square(gsl_matrix_get(P_1,XX,i)-gsl_matrix_get(Q_0,XX,j));
+					double y2	= square(gsl_matrix_get(P_1,YY,i)-gsl_matrix_get(Q_0,YY,j));
+					double z2	= square(gsl_matrix_get(P_1,ZZ,i)-gsl_matrix_get(Q_0,ZZ,j));
+					double r2	= x2+y2+z2;
+					total_rmsd	+= r2;
+					tot_cnt		+= 1.0;
+				}
+			}
+			total_rmsd/=tot_cnt;
 	
-		rmsd=0.0;
-		for( int i=0 ; i<DIM ; i++ ){
-			rmsd += (  square(gsl_matrix_get(DIF,XX,i))
-				 + square(gsl_matrix_get(DIF,YY,i))
-				 + square(gsl_matrix_get(DIF,ZZ,i)) );
-		}
-		rmsd /= cnt;
-		if( rmsd < min_rmsd ){
-			gsl_matrix_memcpy( U , Ut );
-			gsl_vector_memcpy( t , tt );
-			ftyp detC = get_det(C);
-			min_rmsd=rmsd;
-		//	std::cout <<"INFO::" << II << " " << det << " " << detC << std::endl;
+			if( total_rmsd < min_rmsd ){
+				gsl_matrix_memcpy( U , Ut );
+				gsl_vector_memcpy( t , tt );
+				min_rmsd = total_rmsd;
+			}
 		}
 	}
+
 	gsl_matrix_free(EYE);	gsl_matrix_free(sqP);
 	gsl_matrix_free(TMP);	gsl_matrix_free(sqQ);
 	gsl_matrix_free( C );	gsl_matrix_free(DIF);
@@ -383,7 +414,7 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 	gsl_vector_free(p0);	gsl_vector_free(w1);
 	gsl_vector_free(q0);	gsl_vector_free(w2);
 
-	return sqrt(min_rmsd);
+	return min_rmsd;
 }
 
 void

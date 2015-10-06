@@ -123,7 +123,7 @@ namespace richanalysis {
 			void			assign_sub( cluster c1, cluster c2 );
 			bool			subSet() { return (subSet_==1); };
 
-			ftyp			find_centroid_relation( cluster c1, cluster c2 );
+			std::vector<int>	find_centroid_relation( void );
 
 			std::vector<int>	find_simple_relation( void );
 
@@ -141,6 +141,7 @@ namespace richanalysis {
 			std::pair<ftyp, ftyp >	angle_between(cluster c1, cluster c2, int i, int j);
 		private:
 			int subSet_;
+			std::pair<richanalysis::cluster, richanalysis::cluster > parents_;
 			std::vector<richanalysis::cluster > vc1_, vc2_; // subclusters
 			int bDirRel_;
 			std::vector<int> idx_;
