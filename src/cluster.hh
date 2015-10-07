@@ -128,7 +128,7 @@ namespace richanalysis {
 
 			std::vector<int>	find_simple_relation( void );
 
-			ftyp			apply_fragment_trans( void );
+			particles		apply_fragment_trans( particles, std::vector<int> );
 
 			std::vector<int> 	get_indices(void){ return idx_; };
 			int			direction_relation(void){ return bDirRel_;};
