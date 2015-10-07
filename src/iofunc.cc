@@ -339,7 +339,6 @@ fileIO::output_pdb( std::string filename, gmat *M, gvec *w ) {
 	outp_coord.close();
 }
 
-
 void 
 fileIO::output_pdb( std::string filename, gmat *M, std::vector<std::string > anames ) {
 //NOTE:: pymol can color the clusters with CMD:: util.cbc

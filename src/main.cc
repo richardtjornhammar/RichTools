@@ -312,14 +312,25 @@ int main (int argc, char **argv) {
 
 	richanalysis::cluster_node nidx;
 
-	nidx.assign_sub(cl2,cl1);
+	nidx.assign_sub(cl1,cl2);
 	std::vector<int> fio_ndx, rel_ndx = nidx.find_centroid_relation();
+
 	particles align_space = nidx.apply_rot_trans( carth_space );
-	for(int i=0; i<crd_ndx.size(); i++) {
+
+	for( int i=0 ; i<crd_ndx.size() ; i++ ) {
 		fio_ndx.push_back( rel_ndx[crd_ndx[i]] );
 	}
-	fIO.output_pdb("color-rel-n"+ns+".pdb", align_space , fio_ndx);
 
+	nidx.apply_fragment_trans();
+	particles frag_space = nidx.assign_particles();
+	std::cout << "INFO:: " << frag_space.size() << " AND " << align_space.size() << std::endl;
+
+	for(int i=0;i<frag_space.size();i++){
+		frag_space[i].first=align_space[i].first;
+	}
+
+	fIO.output_pdb("color-rel-n"+ns+".pdb", align_space , fio_ndx);
+	fIO.output_pdb("frag-rel-n"+ns+".pdb" , frag_space  , fio_ndx);
 /*
 	ftyp rmsd = 0.0;
 	rmsd = nidx.find_centroid_relation(cl1,cl2);
@@ -333,8 +344,6 @@ int main (int argc, char **argv) {
 	for(int i=0; i<den_ndx.size(); i++) {
 		nden += den_ndx[i]==icl?1:0;
 	}
-
-
 
 	particles align_space;
 	align_space = nidx.apply_rot_trans( carth_space );

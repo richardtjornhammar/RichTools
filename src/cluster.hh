@@ -84,6 +84,7 @@ namespace richanalysis {
 			int			length_M(void){ return M_->size2; };
 			void	copyC(gmat *C0){ if(C0->size1==C_->size1&&C0->size2==C_->size2) { gsl_matrix_memcpy(C0, C_); } };
 			void	copyM(gmat *M0){ if(M0->size1==M_->size1&&M0->size2==M_->size2) { gsl_matrix_memcpy(M0, M_); } };
+			void	setM( gmat *M0){ if(M0->size1==M_->size1&&M0->size2==M_->size2) { gsl_matrix_memcpy(M_, M0); } };
 			void	copyUc(gmat *U0){ if(U0->size1==Uc_->size1&&U0->size2==Uc_->size2) { gsl_matrix_memcpy(U0, Uc_); } };
 			void	copytc(gvec *tc0){ if(tc0->size ==tc_->size) { gsl_vector_memcpy(tc0, tc_); } };
 			void	copyv(gvec *v0){ if(v0->size ==vc_->size) { gsl_vector_memcpy(v0, vc_); } };
@@ -127,13 +128,14 @@ namespace richanalysis {
 
 			std::vector<int>	find_simple_relation( void );
 
-			ftyp			find_shape_trans( cluster c1, cluster c2 );
+			ftyp			apply_fragment_trans( void );
 
 			std::vector<int> 	get_indices(void){ return idx_; };
 			int			direction_relation(void){ return bDirRel_;};
 			int			have_transform(void){ return bUtSet_; };
 			particles 		apply_rot_trans( particles , int );
 			particles 		apply_rot_trans( particles );
+			particles		assign_particles( void ); // packs subclusters into a particles struct
 			void			invert_transform(void);
 			void			printUt(void){  output_matrix(U_); output_vector(t_); };
 			void			printiUt(void){ output_matrix(iU_);output_vector(it_);};

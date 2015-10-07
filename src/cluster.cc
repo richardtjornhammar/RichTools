@@ -390,10 +390,10 @@ cluster_node::find_simple_relation( void ){
 	for(int i=0;i<N;i++) {
 	double rmsd0=100.0;
 	for(int j=0;j<M;j++) {
-		gmat *P = gsl_matrix_calloc(DIM,vc1_[i].length_M());
-		vc1_[i].copyM(P);
-		gmat *Q = gsl_matrix_calloc(DIM,vc2_[j].length_M());
-		vc2_[j].copyM(Q);
+		gmat *P = gsl_matrix_calloc(DIM,vc2_[i].length_M());
+		vc2_[i].copyM(P);
+		gmat *Q = gsl_matrix_calloc(DIM,vc1_[j].length_M());
+		vc1_[j].copyM(Q);
 		gmat *U = gsl_matrix_calloc(DIM,DIM);
 		gvec *t = gsl_vector_calloc(DIM);
 
@@ -516,8 +516,8 @@ std::vector<int>
 cluster_node::find_centroid_relation( void ){
 	ftyp min_rmsd	= 1.0E10;
 
-	cluster c1 = parents_.second;
-	cluster c2 = parents_.first;
+	cluster c1 = parents_.first;
+	cluster c2 = parents_.second;
 
 	int N = c1.length_C();
 
@@ -793,33 +793,81 @@ cluster_node::angle_between(cluster c1, cluster c2, int I, int J){
 
 
 ftyp
-cluster_node::find_shape_trans( cluster c1, cluster c2 ){
-//	Do a single shape fit
+cluster_node::apply_fragment_trans( void ){
+	
+	if(idx_.size() == vc1_.size() && vc2_.size() == vc1_.size() ) {
 
-	int N = c1.length_M();
-	gmat *MEN	= gsl_matrix_calloc( DIM, N );
-	c1.copyM(MEN);
+		for(int i=0;i<idx_.size();i++) {
 
-	int M = c2.length_M();
-	gmat *MNT	= gsl_matrix_calloc( DIM, M );
-	c2.copyM(MNT);
+			gmat *P = gsl_matrix_calloc(DIM,vc2_[idx_[i]].length_M());
+			vc2_[idx_[i]].copyM(P);
+			gmat *Q = gsl_matrix_calloc(DIM,vc1_[i].length_M());
+			vc1_[i].copyM(Q);
+			gmat *U = gsl_matrix_calloc(DIM,DIM);
+			gvec *t = gsl_vector_calloc(DIM);
+			ftyp rmsd = shape_fit( Q, P, U, t, 2);	// it is applied here but for clarity waste some comp
 
-	gmat *U		= gsl_matrix_calloc( DIM, DIM );
-	gvec *t		= gsl_vector_calloc( DIM );
+			vc2_[idx_[i]].copyM(P);
+			apply_fit ( P, U, t );
+			vc2_[idx_[i]].setM(P);
+			output_matrix(P);
 
-	ftyp min_rmsd = shape_fit(MNT,MEN,U,t,1);
+			gsl_matrix_memcpy (U_, U);
+			gsl_vector_memcpy (t_, t);
+			invert_transform();
+			bUtSet_=1;
+			sgn_=1;
 
-	gsl_matrix_memcpy (U_, U);
-	gsl_vector_memcpy (t_, t);
-	invert_transform();
-	bUtSet_=1;
-	sgn_=1;
+			gsl_matrix_free(P);
+			gsl_matrix_free(Q);
+			gsl_matrix_free(U); 
+			gsl_vector_free(t);
+		}
+/*
+		int N 		= vc1_[0].length_M();
+		gmat *MEN	= gsl_matrix_calloc( DIM, N );
+		vc1_[0].copyM(MEN);
 
-	gsl_matrix_free(MNT);
-	gsl_matrix_free(MEN);
+		int M 		= vc2_[0].length_M();
+		gmat *MNT	= gsl_matrix_calloc( DIM, M );
+		vc2_[0].copyM(MNT);
 
-	gsl_matrix_free(U); 
-	gsl_vector_free(t);
+		gmat *U		= gsl_matrix_calloc( DIM, DIM );
+		gvec *t		= gsl_vector_calloc( DIM );
+	
+		ftyp min_rmsd = shape_fit(MNT,MEN,U,t,1);
 
-	return min_rmsd;
+		gsl_matrix_memcpy (U_, U);
+		gsl_vector_memcpy (t_, t);
+		invert_transform();
+		bUtSet_=1;
+		sgn_=1;
+*/
+	}
+
+	return 0.0;
+}
+
+particles 
+cluster_node::assign_particles(void){
+	particles ps;
+	if(idx_.size() == vc2_.size()  ) {
+		std::cout << "INFOINFOINFO" << std::endl;
+		for(int i=0;i<vc2_.size();i++){
+			int N = vc2_[i].length_M();
+			gsl_matrix *M=gsl_matrix_calloc(DIM,N);
+			gsl_vector *gv =gsl_vector_calloc(DIM);
+			vc2_[i].copyM(M);
+			for(int j=0;j<N;j++){
+				particle p;
+				p.second = gsl_vector_calloc(DIM);
+				gsl_matrix_get_col (gv, M, j);
+				gsl_vector_memcpy(p.second, gv);
+				ps.push_back(p);
+			}
+			gsl_matrix_free(M);
+			gsl_vector_free(gv);
+		}
+	}
+	return ps;
 }
