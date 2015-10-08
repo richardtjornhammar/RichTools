@@ -817,7 +817,6 @@ cluster_node::apply_fragment_trans( particles coords , std::vector<int> p_ndx)
 		particles swap_trans;
 		std::vector<int> cidx;
 		for(int i=0;i<idx_.size();i++) {
-
 			// HERE WE ARE IN CLUSTER I WITH PARTICLES IDX_[I]
 
 			richanalysis::coord_format cf;
@@ -856,7 +855,7 @@ cluster_node::apply_fragment_trans( particles coords , std::vector<int> p_ndx)
 			gsl_vector_free(t);
 			for(int j=0;j<p_i.size();j++){
 				swap_trans.push_back(p_i[j]);
-				cidx.push_back(i);
+				cidx.push_back(idx_[i]);
 			}
 		}
 		cidx.swap(p_ndx);
