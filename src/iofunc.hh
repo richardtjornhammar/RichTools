@@ -61,6 +61,8 @@ namespace richanalysis {
 
 		//! Outputs a gsl vector
 			void output_vector(gvec *v);
+
+			void output_geometry( particles px );
 	};
 
 	class fileIO {
@@ -68,7 +70,6 @@ namespace richanalysis {
 		//! I
 			particles read_xyz(std::string filename);
 		//! O
-			void output_geometry( particles px );
 			void output_geometry( particles px, std::string filename);
 			void output_geometry( particles px, std::string filename, std::string label);
 		//! SPECIAL FORMAT

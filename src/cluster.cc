@@ -398,10 +398,7 @@ cluster_node::find_simple_relation( void ){
 		gvec *t = gsl_vector_calloc(DIM);
 
 		ftyp rmsd=shape_fit( P, Q, U, t, 2);
-//
-		std::cout << "INFO::"<< "HAVE::RMSD::" << rmsd << " i " << i << " j " << j 
-			<< " L1 " << P->size2 << " L2 " << Q->size2 << std::endl;
-//
+
 		std::pair<int,int> pi;
 		pi.first=i; pi.second=j;
 		rmsds.push_back(rmsd);
@@ -484,24 +481,44 @@ cluster_node::assign_sub( cluster c1, cluster c2 ) {
 
 particles 
 cluster_node::apply_rot_trans( particles px , int I){
+
+	particles rpx;
+	for(int i=0;i<px.size();i++){
+		particle p0;
+		p0.first	= px[i].first;
+		p0.second	= gsl_vector_calloc(DIM);
+		gsl_vector_memcpy( p0.second, px[i].second);
+		rpx.push_back( p0 );
+	}
+
 	if(bUtSet_){
 		if(I>=0)
-			apply_fit( px, U_, t_	);
+			apply_fit( rpx,  U_, t_	 );
 		if(I<0)
-			apply_fit( px, iU_, it_	);
+			apply_fit( rpx, iU_, it_ );
 	}
-	return px;
+
+	return rpx;
 }
 
 particles 
 cluster_node::apply_rot_trans( particles px ){
+	particles rpx;
+	for(int i=0;i<px.size();i++){
+		particle p0;
+		p0.first	= px[i].first;
+		p0.second	= gsl_vector_calloc(DIM);
+		gsl_vector_memcpy( p0.second, px[i].second);
+		rpx.push_back( p0 );
+	}
+
 	if(bUtSet_){
 		if(sgn_>=0)
-			apply_fit( px, U_, t_	);
+			apply_fit( rpx,  U_, t_	 );
 		if(sgn_<0)
-			apply_fit( px, iU_, it_	);
+			apply_fit( rpx, iU_, it_ );
 	}
-	return px;
+	return rpx;
 }
 
 void
@@ -792,36 +809,44 @@ cluster_node::angle_between(cluster c1, cluster c2, int I, int J){
 }
 
 
-particles
-cluster_node::apply_fragment_trans( particles coords , std::vector<int> p_ndx){
-	
+std::pair<particles, std::vector<int> >
+cluster_node::apply_fragment_trans( particles coords , std::vector<int> p_ndx)
+{
+	std::pair<particles, std::vector<int> > p_id;
 	if( idx_.size() == vc1_.size() && vc2_.size() == vc1_.size() && p_ndx.size()==coords.size() ) {
-
+		particles swap_trans;
+		std::vector<int> cidx;
 		for(int i=0;i<idx_.size();i++) {
-			//HERE WE ARE IN CLUSTER I WITH PARTICLES IDX_[I]
+
+			// HERE WE ARE IN CLUSTER I WITH PARTICLES IDX_[I]
+
 			richanalysis::coord_format cf;
-			particles p_i = cf.par2par(coords,p_ndx,idx_[i]);
+			particles p_i = cf.par2par(coords, p_ndx, idx_[i]);
 
 			if( p_i.size() != vc2_[i].length_M() )
 				std::cout << "INFO::FORMAT::ERROR " <<  p_i.size() << " AND " << vc2_[i].length_M() << std::endl;
 
-			gmat *P = gsl_matrix_calloc(DIM,vc2_[i].length_M());
-			vc2_[i].copyM(P);
-			gmat *Q = gsl_matrix_calloc(DIM,vc1_[idx_[i]].length_M());
-			vc1_[idx_[i]].copyM(Q);
+			gmat *P = gsl_matrix_calloc( DIM,	vc1_[idx_[i]].length_M()	);
+			gmat *Q = gsl_matrix_calloc( DIM,	vc2_[i].length_M()		);
+
+			vc1_[idx_[i]].copyM(P); // DATA IN P 
+			vc2_[i].copyM(Q);	// MODEL IN Q 
 
 			gmat *U = gsl_matrix_calloc(DIM,DIM);
 			gvec *t = gsl_vector_calloc(DIM);
-			ftyp rmsd = shape_fit( Q, P, U, t, 2);	// it is applied here but for clarity waste some comp
-
-			vc2_[i].copyM(P);
-			apply_fit ( P, U, t );
-			vc2_[i].setM(P);
-			output_matrix(P);
+			ftyp rmsd = shape_fit( P, Q, U, t, 1 );
 
 			gsl_matrix_memcpy (U_, U);
 			gsl_vector_memcpy (t_, t);
 			invert_transform();
+			particles p_tmp = apply_rot_trans( p_i , 1 );
+
+			p_tmp.swap(p_i);
+			p_tmp.clear();
+
+			std::cout << "INFO::MODEL" << std::endl;
+			output_geometry(p_i);
+
 			bUtSet_=1;
 			sgn_=1;
 
@@ -829,30 +854,20 @@ cluster_node::apply_fragment_trans( particles coords , std::vector<int> p_ndx){
 			gsl_matrix_free(Q);
 			gsl_matrix_free(U); 
 			gsl_vector_free(t);
+			for(int j=0;j<p_i.size();j++){
+				swap_trans.push_back(p_i[j]);
+				cidx.push_back(i);
+			}
 		}
-/*
-		int N 		= vc1_[0].length_M();
-		gmat *MEN	= gsl_matrix_calloc( DIM, N );
-		vc1_[0].copyM(MEN);
-
-		int M 		= vc2_[0].length_M();
-		gmat *MNT	= gsl_matrix_calloc( DIM, M );
-		vc2_[0].copyM(MNT);
-
-		gmat *U		= gsl_matrix_calloc( DIM, DIM );
-		gvec *t		= gsl_vector_calloc( DIM );
-	
-		ftyp min_rmsd = shape_fit(MNT,MEN,U,t,1);
-
-		gsl_matrix_memcpy (U_, U);
-		gsl_vector_memcpy (t_, t);
-		invert_transform();
-		bUtSet_=1;
-		sgn_=1;
-*/
+		cidx.swap(p_ndx);
+		cidx.clear();
+		p_id.first=swap_trans;
+	}else{
+		p_id.first=coords;
 	}
+	p_id.second = p_ndx;
 
-	return coords;
+	return p_id;
 }
 
 particles 

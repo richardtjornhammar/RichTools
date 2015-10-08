@@ -265,8 +265,8 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 		return(-2.0); 				// PROBLEMS WITH VALUE
 	}
 
-	gsl_vector *w1 = gsl_vector_alloc((int)P->size2);
-	gsl_vector *w2 = gsl_vector_alloc((int)Q->size2);
+	gsl_vector *w1 = gsl_vector_calloc((int)P->size2);
+	gsl_vector *w2 = gsl_vector_calloc((int)Q->size2);
 	gsl_vector_set_all( w1 , 1.0/wsum1 );
 	gsl_vector_set_all( w2 , 1.0/wsum2 );
 
@@ -275,18 +275,19 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 
 	calc_centroid(P,w1,p0); center_matrix(P,p0);
 	calc_centroid(Q,w2,q0); center_matrix(Q,q0);
+
 	gsl_matrix *P_0 = gsl_matrix_alloc(P->size1,P->size2);
 	gsl_matrix *P_1 = gsl_matrix_alloc(P->size1,P->size2);
 	gsl_matrix *Q_0 = gsl_matrix_alloc(Q->size1,Q->size2);
-	gsl_matrix_memcpy( P_0, P );
-	gsl_matrix_memcpy( Q_0, Q );
 
 	gsl_matrix *w1P = gsl_matrix_alloc(P->size1,P->size2);
 	calc_vmprod( w1, P, w1P );
 	gsl_matrix *w2Q = gsl_matrix_alloc(Q->size1,Q->size2);
 	calc_vmprod( w2, Q, w2Q );
+	gsl_matrix_memcpy( P_0, w1P );
+	gsl_matrix_memcpy( Q_0, w2Q );
 
-	gsl_matrix *DIF = gsl_matrix_alloc( D, D );
+	gsl_matrix *DIF	= gsl_matrix_alloc( D, D );
 	gsl_matrix *sqP = gsl_matrix_calloc( D, D );
 	gsl_matrix *sqQ = gsl_matrix_calloc( D, D );
 	gsl_matrix *sqP0 = gsl_matrix_calloc( D, D );
@@ -303,45 +304,44 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 	gsl_matrix_memcpy( sqP, C );
 
 ////	THIS IS WHERE THE DECOMPOSITION OCCURS
-	gsl_matrix *W1	= gsl_matrix_alloc( D, D );
-	gsl_matrix *V1	= gsl_matrix_alloc( D, D );
+	gsl_matrix *U1	= gsl_matrix_alloc( D, D );
 	gsl_vector *S1	= gsl_vector_alloc( D );
+	gsl_matrix *V1	= gsl_matrix_alloc( D, D );
+
 	gsl_vector *wrk1= gsl_vector_alloc( D );
 
-	gsl_linalg_SV_decomp ( C, V1, S1, wrk1 );
-	gsl_matrix_memcpy( W1, C );	// HAVE ROTATION
+	gsl_linalg_SV_decomp ( C, V1, S1, wrk1 ); // HAVE SHAPE
+	gsl_matrix_memcpy( U1, C );	
 
 	gsl_blas_dgemm(CblasNoTrans,CblasTrans, 1.0, w2Q, w2Q, 0.0, C);
 	gsl_matrix_memcpy( sqQ, C );
 
 //	AND THE SECOND SET
-	gsl_matrix *W2	= gsl_matrix_alloc( D, D );
-	gsl_matrix *V2	= gsl_matrix_alloc( D, D );
+	gsl_matrix *U2	= gsl_matrix_alloc( D, D );
 	gsl_vector *S2	= gsl_vector_alloc( D );
+	gsl_matrix *V2	= gsl_matrix_alloc( D, D );
 	gsl_vector *wrk2= gsl_vector_alloc( D );
 
-	gsl_linalg_SV_decomp ( C, V2, S2, wrk2 );
-	gsl_matrix_memcpy( W2, C );	// HAVE ROTATION
+	gsl_linalg_SV_decomp ( C, V2, S2, wrk2 );// HAVE SHAPE
+	gsl_matrix_memcpy( U2, C ); 
 
 ////	ROTATION	FOR THE MODEL (Q)
 //	TAKE NOTE OF THE RESULTING SIGN ON U
 	gsl_matrix *Ut = gsl_matrix_calloc( D, D );
 	gsl_vector *tt = gsl_vector_calloc( D );
-	gsl_matrix_memcpy( Ut , U );
-	ftyp cnt=(ftyp)DIM;
 
-	gsl_blas_dgemm(CblasNoTrans,CblasTrans, 1.0, W1, W2, 0.0, C);
-	ftyp det = get_det(C);
+	ftyp cnt=(ftyp)DIM;
 
 	ftyp rmsd	= 0.0 , min_rmsd	= 1e10;
 	ftyp total_rmsd	= 0.0 , total_min_rmsd	= 1e10;
 	ftyp xi 	= 1.0 , gau_norm 	= 1.0/sqrt(2.0*M_PI)/xi;
+
 	for(int II=0;II<8;II++)
 	{
-		gsl_vector_memcpy(tt, p0);
+		gsl_vector_memcpy( tt, p0 );
 		gsl_matrix_set_identity( EYE );
-		gsl_matrix_memcpy( P_0, P );
-		gsl_matrix_memcpy( Q_0, Q );
+		gsl_matrix_memcpy( P_0, w1P );
+		gsl_matrix_memcpy( Q_0, w2Q );
 		gsl_matrix_memcpy( sqP0, sqP );
 		gsl_matrix_memcpy( sqQ0, sqQ );
 
@@ -357,15 +357,15 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 			default: break;
 		}
 
-		gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, W2, 0.0, TMP ); 
-		gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, W1, TMP, 0.0, C ); 	
+		gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, V2, 0.0, TMP ); 
+		gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, V1, TMP, 0.0, C ); 	
 
 		gsl_matrix_memcpy( Ut , C );
 		gsl_blas_dgemv( CblasNoTrans, -1.0, Ut, q0, 1.0, tt );
 
 		if( type == 1 ) {
 			gsl_matrix_memcpy( DIF, sqQ0 );
-			gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, Ut, sqP0, -1.0, DIF);
+			gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, Ut, sqP0, -1.0, DIF );
 		
 			rmsd=0.0;
 			for( int i=0 ; i<DIM ; i++ ){
@@ -379,14 +379,14 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 				gsl_vector_memcpy( t , tt );
 				min_rmsd = rmsd;
 			}
-		}else {
+		} else {
 			gsl_blas_dgemm(CblasNoTrans,CblasNoTrans, 1.0, Ut, P_0, 0.0, P_1 );
 			ftyp tot_cnt=1.0;	
-			for(int i=0;i<P_0->size2;i++) {
+			for(int i=0;i<P_1->size2;i++) {
 				for(int j=0;j<Q_0->size2;j++) {
-					double x2	= square(gsl_matrix_get(P_1,XX,i)-gsl_matrix_get(Q_0,XX,j));
-					double y2	= square(gsl_matrix_get(P_1,YY,i)-gsl_matrix_get(Q_0,YY,j));
-					double z2	= square(gsl_matrix_get(P_1,ZZ,i)-gsl_matrix_get(Q_0,ZZ,j));
+					double x2	= square( gsl_matrix_get(P_1,XX,i)-gsl_matrix_get(Q_0,XX,j) );
+					double y2	= square( gsl_matrix_get(P_1,YY,i)-gsl_matrix_get(Q_0,YY,j) );
+					double z2	= square( gsl_matrix_get(P_1,ZZ,i)-gsl_matrix_get(Q_0,ZZ,j) );
 					double r2	= x2+y2+z2;
 					total_rmsd	+= r2;
 					tot_cnt		+= 1.0;
@@ -407,7 +407,7 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 	gsl_matrix_free( C );	gsl_matrix_free(DIF);
 	gsl_matrix_free( V );
 	gsl_matrix_free(w1P);	gsl_matrix_free(w2Q);
-	gsl_matrix_free(W1);	gsl_matrix_free(W2);
+	gsl_matrix_free(U1);	gsl_matrix_free(U2);
 	gsl_matrix_free(V1);	gsl_matrix_free(V2);
 	gsl_vector_free(S1);	gsl_vector_free(S2);
 	gsl_vector_free(wrk1);	gsl_vector_free(wrk2);
@@ -602,15 +602,21 @@ fitting::apply_fit( gmat *M, gmat *U, gvec *t) {
 
 void 
 fitting::apply_fit( particles px, gmat *U, gvec *t) {
-	gsl_vector *pos = gsl_vector_alloc( 3 );
-	gsl_vector *res = gsl_vector_alloc( 3 );
+	gsl_vector *pos = gsl_vector_calloc( DIM );
+	gsl_vector *res = gsl_vector_calloc( DIM );
+	gsl_vector *com = gsl_vector_calloc( DIM );
 	int L = ((int)px.size());
-
-	for( int i=0 ; i<L ; i++ ){
+/*
+	for( int i=0 ; i<L ; i++ )
+		gsl_vector_add (com, px[i].second);
+	gsl_vector_scale( com , 1.0/px.size() );
+*/
+	for( int i=0 ; i<L ; i++ ) {
 		gsl_vector_set( pos, XX, gsl_vector_get( px[i].second,XX ) );
 		gsl_vector_set( pos, YY, gsl_vector_get( px[i].second,YY ) );
 		gsl_vector_set( pos, ZZ, gsl_vector_get( px[i].second,ZZ ) );
-
+		
+//		gsl_vector_sub( pos, com );
 		gsl_blas_dgemv(CblasNoTrans, 1.0, U, pos, 0.0, res);
 
 		gsl_vector_set( px[i].second , XX, gsl_vector_get(res,XX)+gsl_vector_get(t,XX) );
@@ -619,6 +625,7 @@ fitting::apply_fit( particles px, gmat *U, gvec *t) {
 	}
 	gsl_vector_free(pos);
 	gsl_vector_free(res);
+	gsl_vector_free(com);
 }
 
 

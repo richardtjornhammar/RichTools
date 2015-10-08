@@ -314,18 +314,18 @@ int main (int argc, char **argv) {
 
 	nidx.assign_sub(cl1,cl2);
 	std::vector<int> fio_ndx, rel_ndx = nidx.find_centroid_relation();
-
 	particles align_space = nidx.apply_rot_trans( carth_space );
 
 	for( int i=0 ; i<crd_ndx.size() ; i++ ) {
 		fio_ndx.push_back( rel_ndx[crd_ndx[i]] );
 	}
-	particles frag_space = nidx.apply_fragment_trans( carth_space , fio_ndx );
-	std::cout << "INFO:: " << frag_space.size() << " AND " << align_space.size() << std::endl;
+	fIO.output_pdb("color-rel-n"+ns+".pdb", align_space  , fio_ndx );
 
-	fIO.output_pdb("color-rel-n"+ns+".pdb", align_space , fio_ndx);
-//	fIO.output_pdb("frag-rel-n"+ns+".pdb" , frag_space  , fio_ndx);
+	std::pair<particles, std::vector<int> > pf_id;
+	pf_id = nidx.apply_fragment_trans( carth_space , fio_ndx );
+	std::cout << "INFO:: " << pf_id.first.size() << " AND " << align_space.size() << std::endl;
 
+	fIO.output_pdb("frag-rel-n"+ns+".pdb" , pf_id.first  , pf_id.second );
 
 	return 0;
 }

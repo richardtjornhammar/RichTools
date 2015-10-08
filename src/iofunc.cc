@@ -80,7 +80,7 @@ tensorIO::output_matrix(gmat *M){
 
 
 void 
-fileIO::output_geometry(particles px) {
+tensorIO::output_geometry(particles px) {
 	int n=px.size();
 	std::cout << n << std::endl;
 	std::cout << "FLUSHED COORDS" << std::endl;
