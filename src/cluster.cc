@@ -539,7 +539,7 @@ cluster_node::find_centroid_relation( void ){
 	int N = c1.length_C();
 
 	if(N != c2.length_C())
-		std::cout <<"ERROR IN IDX REL"<<std::endl;
+		std::cout << "ERROR IN IDX REL" << std::endl;
 
 	gmat *U		= gsl_matrix_calloc( DIM, DIM );
 	gvec *t		= gsl_vector_calloc( DIM );
@@ -561,6 +561,7 @@ cluster_node::find_centroid_relation( void ){
 	std::vector<int> iv;
 	for(int i=0;i<N;i++)
 		iv.push_back(i);
+
 	std::vector<std::vector<int> > imv = all_permutations(iv);
 
 	for(int j=0;j<imv.size();j++){
@@ -581,16 +582,26 @@ cluster_node::find_centroid_relation( void ){
 	if(idx_.size()!=0) {
 		std::cout << "INFO::ERROR WITH IDX_" << std::endl;
 		idx_.clear();
+		iidx_.clear();
 	}
+	for(int i=0;i<iv.size();i++)
+		iidx_.push_back(0);
 
 	for(int i=0;i<iv.size();i++){
 		idx_.push_back(imv[J][i]);
 		iv[i]=imv[J][i];
+		iidx_[imv[J][i]]=i;
 	}
 
 	bDirRel_=2*(c1.length_M()>c2.length_M())-1;
-
-//	if(!have_transform())
+/*
+	parents_.second.vc_
+	i -> vc_[i] push_back(vc_[i]), count -> nvc_[i]
+	// order of vc_ in idx_
+	check vc_[i]==idx_
+	super_idx_.push_back()
+*/
+	if(!have_transform())
 	{
 		gsl_matrix_memcpy (U_, Ut);
 		gsl_vector_memcpy (t_, tt);
@@ -808,6 +819,39 @@ cluster_node::angle_between(cluster c1, cluster c2, int I, int J){
 	return ang_dist;
 }
 
+std::vector<int>
+cluster_node::global_fragment_order( void )
+{
+	std::vector<int> at_order, tmp_order;
+
+	if( cidx_.size() == parents_.second.length_M() )
+	{
+		gsl_vector *gv = gsl_vector_calloc( parents_.second.length_M() );
+		parents_.second.copyv(gv);
+
+		int N=gv->size;
+		for(int i=0;i<N;i++) {
+			tmp_order.push_back( (int)gsl_vector_get(gv,i) );
+		}
+
+		for(int i=0;i<N;i++){
+			int c = tmp_order[i];
+			for(int j=0;j<N;j++) {
+				int cj = ( cidx_[j]>=0 )?(iidx_[cidx_[j]]):(-1);
+				if( c == cj ) {
+					at_order.push_back(j);
+					cidx_[j]=(cidx_[j]+1)*(-1);
+					break;
+				}
+			}
+		}
+		for(int i=0;i<N;i++) {
+			cidx_[i] = (-1)*(cidx_[i])-1;
+		}
+	}
+
+	return at_order;
+}
 
 std::pair<particles, std::vector<int> >
 cluster_node::apply_fragment_trans( particles coords , std::vector<int> p_ndx)
@@ -817,10 +861,9 @@ cluster_node::apply_fragment_trans( particles coords , std::vector<int> p_ndx)
 		particles swap_trans;
 		std::vector<int> cidx;
 		for(int i=0;i<idx_.size();i++) {
-			// HERE WE ARE IN CLUSTER I WITH PARTICLES IDX_[I]
 
 			richanalysis::coord_format cf;
-			particles p_i = cf.par2par(coords, p_ndx, idx_[i]);
+			particles p_i = cf.par2par( coords, p_ndx, idx_[i] );
 
 			if( p_i.size() != vc2_[i].length_M() )
 				std::cout << "INFO::FORMAT::ERROR " <<  p_i.size() << " AND " << vc2_[i].length_M() << std::endl;
@@ -828,7 +871,7 @@ cluster_node::apply_fragment_trans( particles coords , std::vector<int> p_ndx)
 			gmat *P = gsl_matrix_calloc( DIM,	vc1_[idx_[i]].length_M()	);
 			gmat *Q = gsl_matrix_calloc( DIM,	vc2_[i].length_M()		);
 
-			vc1_[idx_[i]].copyM(P); // DATA IN P 
+			vc1_[idx_[i]].copyM(P); // DATA  IN P 
 			vc2_[i].copyM(Q);	// MODEL IN Q 
 
 			gmat *U = gsl_matrix_calloc(DIM,DIM);
@@ -843,9 +886,6 @@ cluster_node::apply_fragment_trans( particles coords , std::vector<int> p_ndx)
 			p_tmp.swap(p_i);
 			p_tmp.clear();
 
-			std::cout << "INFO::MODEL" << std::endl;
-			output_geometry(p_i);
-
 			bUtSet_=1;
 			sgn_=1;
 
@@ -855,7 +895,8 @@ cluster_node::apply_fragment_trans( particles coords , std::vector<int> p_ndx)
 			gsl_vector_free(t);
 			for(int j=0;j<p_i.size();j++){
 				swap_trans.push_back(p_i[j]);
-				cidx.push_back(idx_[i]);
+				cidx.push_back( idx_[i] );
+				cidx_.push_back(idx_[i]);
 			}
 		}
 		cidx.swap(p_ndx);
@@ -873,7 +914,6 @@ particles
 cluster_node::assign_particles(void){
 	particles ps;
 	if(idx_.size() == vc2_.size()  ) {
-		std::cout << "INFOINFOINFO" << std::endl;
 		for(int i=0;i<vc2_.size();i++){
 			int N = vc2_[i].length_M();
 			gsl_matrix *M=gsl_matrix_calloc(DIM,N);

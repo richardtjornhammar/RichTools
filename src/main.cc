@@ -325,7 +325,8 @@ int main (int argc, char **argv) {
 	pf_id = nidx.apply_fragment_trans( carth_space , fio_ndx );
 	std::cout << "INFO:: " << pf_id.first.size() << " AND " << align_space.size() << std::endl;
 
-	fIO.output_pdb("frag-rel-n"+ns+".pdb" , pf_id.first  , pf_id.second );
+	std::vector<int> at_order = nidx.global_fragment_order();
+	fIO.output_pdb("frag-rel-n"+ns+".pdb" , pf_id.first  , pf_id.second , at_order);
 
 	return 0;
 }

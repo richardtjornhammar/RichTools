@@ -132,6 +132,7 @@ namespace richanalysis {
 			std::vector<int> >	apply_fragment_trans( particles, std::vector<int> );
 
 			std::vector<int> 	get_indices(void){ return idx_; };
+			std::vector<int> 	global_fragment_order(void);
 			int			direction_relation(void){ return bDirRel_;};
 			int			have_transform(void){ return bUtSet_; };
 			particles 		apply_rot_trans( particles , int );
@@ -147,7 +148,9 @@ namespace richanalysis {
 			std::pair<richanalysis::cluster, richanalysis::cluster > parents_;
 			std::vector<richanalysis::cluster > vc1_, vc2_; // subclusters
 			int bDirRel_;
-			std::vector<int> idx_;
+			std::vector<int> idx_;		// clusters
+			std::vector<int> iidx_;		// clusters
+			std::vector<int> cidx_;
 			int N_,M_,I_,J_;
 			int bUtSet_;
 			int sgn_;

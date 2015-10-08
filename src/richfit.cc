@@ -606,17 +606,12 @@ fitting::apply_fit( particles px, gmat *U, gvec *t) {
 	gsl_vector *res = gsl_vector_calloc( DIM );
 	gsl_vector *com = gsl_vector_calloc( DIM );
 	int L = ((int)px.size());
-/*
-	for( int i=0 ; i<L ; i++ )
-		gsl_vector_add (com, px[i].second);
-	gsl_vector_scale( com , 1.0/px.size() );
-*/
+
 	for( int i=0 ; i<L ; i++ ) {
 		gsl_vector_set( pos, XX, gsl_vector_get( px[i].second,XX ) );
 		gsl_vector_set( pos, YY, gsl_vector_get( px[i].second,YY ) );
 		gsl_vector_set( pos, ZZ, gsl_vector_get( px[i].second,ZZ ) );
 		
-//		gsl_vector_sub( pos, com );
 		gsl_blas_dgemv(CblasNoTrans, 1.0, U, pos, 0.0, res);
 
 		gsl_vector_set( px[i].second , XX, gsl_vector_get(res,XX)+gsl_vector_get(t,XX) );
