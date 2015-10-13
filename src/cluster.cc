@@ -50,7 +50,270 @@ void
 cluster::alloc_space( int D1, int D2 ) {
 //D1	COORDINATE	SPACE
 //D2	CENTROID	SPACE
-//	std::cout << "INFO::ALLOC::INFO "<< D1 << " " << D2 << " "<<DIM<<std::endl;
+	if( D1 >= D2 ) {
+		M_	= gsl_matrix_calloc( DIM, D1 );	// MODEL
+		C_	= gsl_matrix_calloc( DIM, D2 );	// DATA
+		vc_	= gsl_vector_calloc( D1 );
+		wc_	= gsl_vector_calloc( D2 );
+		bSet_   = true;
+	} else {
+		std::cout << "ERROR IN ALLOCATION ROUTINE:: "<< D1 << ", " << D2 << std::endl;
+	}
+}
+
+int 
+cluster::set_matrix( particles coord_space ) {
+	int D = coord_space.size();
+	int reval=-1;
+	if( bSet_ == 0 ) {
+		alloc_space(D,3);
+	}
+	if( M_->size2 == coord_space.size() && M_->size1 == DIM && bSet_ ) {
+		for(int i=0;i<D; i++){
+			inOrder_.push_back(i);
+			gsl_matrix_set_col ( M_ , i, coord_space[i].second );
+		}
+		gsl_vector_set_all ( vc_ , 1.0 );
+		reval =0; 
+	} else {
+		std::cout << "ERROR:: BAD CONTAINER LENGTHS:: calc_distance_matrix" << std::endl;
+	}
+	find_centroids();
+
+	return  reval;
+}
+
+int
+cluster::find_centroids ( void ){
+	if( bSet_ ) {
+		gsl_kmeans( M_, vc_, C_, wc_ );
+		int N=wc_->size;
+		int M=vc_->size;
+		NperC_.clear();
+		for(int i=0;i<N;i++){
+			int numi=0;
+			for( int j=0 ; j<vc_->size ; j++ ) {
+				numi+=(gsl_vector_get(vc_,j)==i)?1:0;
+			}
+			NperC_.push_back(numi);
+		}
+	}
+	return NperC_.size();
+}
+
+std::vector<int>	
+cluster::get_labels( void ){
+	std::vector<int> ndx;
+	if( bSet_ )
+		for(int i=0;i<vc_->size;i++)
+			ndx.push_back(gsl_vector_get(vc_,i));
+	return ndx;
+}
+
+bool
+node_analysis::assign_node( node n ) {
+
+	cluster c1 = n.first;
+	cluster c2 = n.second;
+	std::vector<int> cindx;
+
+	int N, M, L;
+	if( c1.isSet() && c2.isSet() ) {
+		parents_.first  = c1;
+		parents_.second = c2;
+		std::vector<int> vi;
+		vi = find_centroid_relation(); 
+
+		if( c1.length_C() == c2.length_C() && c1.length_C() == 3 ) {
+			L = c1.length_M();
+			N = c2.length_M();
+			M = c2.length_C();
+			gmat *M1 = gsl_matrix_calloc(DIM,L);
+			gvec *v1 = gsl_vector_calloc(L);
+			gmat *M2 = gsl_matrix_calloc(DIM,N);
+			gvec *v2 = gsl_vector_calloc(N);
+			c2.copyM(M2); c2.copyv(v2);
+			c1.copyM(M1); c1.copyv(v1);
+			for(int i=0;i<v2->size;i++){
+				double val = gsl_vector_get(v2,i);
+				int ival = (int)round(val);
+				int nval = vi[ival];
+				gsl_vector_set(v2,i,nval);
+				cindx.push_back(nval);
+			}
+			parents_.second.writev(v2);
+			cidx_.swap(cindx);
+
+			for( int ipart=0; ipart<M; ipart++ ) { // M CLUSTERS
+
+				richanalysis::coord_format cf;
+				particles px,py;
+				px	= cf.truncmat(M1, v1, ipart);
+				py	= cf.truncmat(M2, v2, ipart);
+				int D	= px.size();
+				int B	= py.size();
+
+				richanalysis::cluster clpx,clpy;	
+				clpx.set_matrix( px );
+				clpx.find_centroids();	
+				clpy.set_matrix( py );
+				clpy.find_centroids();
+				node child;
+				child.first	= clpx;
+				child.second	= clpy;
+				children_.push_back(child);
+			}
+			bNode_ = true;
+		} else {
+			std::cout << "ERROR::ERROR" << std::endl;
+			bNode_ = false;
+		}
+	}
+
+	return bNode_;
+}
+
+
+std::vector<int> 
+node_analysis::find_centroid_relation( void ) {
+	ftyp min_rmsd	= 1.0E10;
+
+	cluster c1 = parents_.first;
+	cluster c2 = parents_.second;
+
+	int N  = c1.length_C();
+
+	if( N != c2.length_C() )
+		std::cout << "ERROR IN IDX REL" << std::endl;
+
+	gmat *U		= gsl_matrix_calloc( DIM, DIM );
+	gvec *t		= gsl_vector_calloc( DIM );
+
+	int J		= 0;
+
+	gmat *C0T	= gsl_matrix_calloc( DIM, N );
+	gmat *C0N	= gsl_matrix_calloc( DIM, N );
+	gmat *CNT	= gsl_matrix_calloc( DIM, N );
+	gmat *CEN	= gsl_matrix_calloc( DIM, N );
+	gvec *gv 	= gsl_vector_calloc( DIM );
+
+	c1.copyC(C0N);
+	c2.copyC(C0T);
+
+	gmat *Ut = gsl_matrix_calloc( DIM, DIM );
+	gvec *tt = gsl_vector_calloc( DIM );
+
+	std::vector<int> iv;
+	for(int i=0;i<N;i++)
+		iv.push_back(i);
+
+	std::vector<std::vector<int> > imv = all_permutations(iv);
+
+	for(int j=0;j<imv.size();j++){
+		gsl_matrix_memcpy (CEN, C0N);
+		for(int i=0;i<iv.size();i++) {
+			gsl_matrix_get_col (gv, C0T, i);
+			gsl_matrix_set_col (CNT, imv[j][i], gv );
+		}
+		ftyp rmsd = kabsch_fit(CNT,CEN,U,t);
+		if(rmsd<min_rmsd) {
+			J=j; 
+			min_rmsd=rmsd;	
+			gsl_matrix_memcpy (Ut, U);
+			gsl_vector_memcpy (tt, t);
+		}
+	}
+
+	if(idx_.size()!=0) {
+		std::cout << "INFO::ERROR WITH IDX_" << std::endl;
+		idx_.clear();
+		iidx_.clear();
+	}
+	for(int i=0;i<iv.size();i++)
+		iidx_.push_back(0);
+
+	for(int i=0;i<iv.size();i++){
+		idx_.push_back(imv[J][i]);
+		iv[i]=imv[J][i];
+		iidx_[imv[J][i]]=i;
+	}
+	
+
+	gsl_matrix_free(CNT);
+	gsl_matrix_free(C0N);
+	gsl_matrix_free(C0T);
+	gsl_matrix_free(U);
+	gsl_vector_free(t);
+	gsl_vector_free(gv);
+
+	return iv;
+}
+
+
+bool
+node_analysis::find_index_orders( void )
+{
+	std::vector<int> at_order, tmp_order, cl_order;
+
+	glob_idx_order_.clear();
+
+	if ( idx_.size() == children_.size() ) 
+	{
+		// std::cout<< "DOING THIS1" << std::endl;
+		cidx_.clear();
+		for ( int i=0 ; i<idx_.size() ; i++ ) 
+		{
+			for ( int j=0 ; j<children_[i].second.length_M() ; j++ ) 
+			{
+				cidx_.push_back(	iidx_[i] 	);
+				cl_order.push_back(	iidx_[i] 	);
+			}
+		}
+	}
+
+	if( cidx_.size() == parents_.second.length_M() )
+	{
+/*
+		// std::cout << "DOING THIS2" << std::endl;
+		gsl_vector *gv = gsl_vector_calloc( parents_.second.length_M() );
+		parents_.second.copyv(gv);
+
+		int N=gv->size;
+		for(int i=0;i<N;i++) 
+		{
+			tmp_order.push_back( (int)gsl_vector_get(gv,i) );
+		}
+
+		for(int i=0;i<N;i++)
+		{
+			int c = tmp_order[i];
+			for(int j=0;j<N;j++) 
+			{
+				int cj = ( cidx_[j]>=0 )?(iidx_[cidx_[j]]):(-1);
+				if( c == cj ) 
+				{
+					at_order.push_back(j);
+					glob_idx_order_.push_back(j);
+					cidx_[j]=(cidx_[j]+1)*(-1);
+					break;
+				}
+			}
+		}
+
+		//cl_order.swap(		cidx_	);
+		//at_order.swap( glob_idx_order_ 	);
+*/
+		return true;
+	}
+
+	return false;
+}
+
+void
+cluster0::alloc_space( int D1, int D2 ) {
+//D1	COORDINATE	SPACE
+//D2	CENTROID	SPACE
+//	std::cout << "INFO::ALLOC::INFO " << D1 << " " << D2 << " " << DIM << std::endl;
 	if(D1>=D2){
 		M_= gsl_matrix_calloc( DIM, D1 );
 		bSet_[0] = 1;
@@ -66,7 +329,7 @@ cluster::alloc_space( int D1, int D2 ) {
 }
 
 int
-cluster::perform_clustering ( void ){
+cluster0::perform_clustering ( void ){
 	if( bSet_[0] && bSet_[1] && bSet_[2] && bSet_[3] ) {
 		gsl_kmeans(M_, vc_, C_, wc_);
 		int N=wc_->size;
@@ -83,7 +346,7 @@ cluster::perform_clustering ( void ){
 }
 
 int
-cluster::perform_clustering ( ftyp cutoff ){
+cluster0::perform_clustering ( ftyp cutoff ){
 	if( bSet_[0] && bSet_[1] && bSet_[2] && bSet_[3] ) {
 		gsl_kmeans(M_, vc_, C_, wc_, cutoff);
 		int N=wc_->size;
@@ -100,31 +363,31 @@ cluster::perform_clustering ( ftyp cutoff ){
 }
 
 void
-cluster::seM ( int i , int j , ftyp val){
+cluster0::seM ( int i , int j , ftyp val){
 	if(i<M_->size1&&j<M_->size2&&i>=0&&j>=0)
 		gsl_matrix_set(M_,i,j,val);
 }
 
 void
-cluster::seC ( int i , int j , ftyp val){
+cluster0::seC ( int i , int j , ftyp val){
 	if(i<C_->size1&&j<C_->size2&&i>=0&&j>=0)
 		gsl_matrix_set(C_,i,j,val);
 }
 
 void
-cluster::sew ( int i, ftyp val ) {
+cluster0::sew ( int i, ftyp val ) {
 	if(i<wc_->size&&i>=0)
 		gsl_vector_set(wc_,i,val);
 }
 
 void
-cluster::sev ( int i, ftyp val ) {
+cluster0::sev ( int i, ftyp val ) {
 	if(i<vc_->size&&i>=0)
 		gsl_vector_set(vc_,i,val);
 }
 
 std::vector<int>	
-cluster::get_labels( void ){
+cluster0::get_labels( void ){
 	std::vector<int> ndx;
 	if( bSet_[0] && bSet_[1] && bSet_[2] && bSet_[3] )
 		for(int i=0;i<vc_->size;i++)
@@ -133,7 +396,7 @@ cluster::get_labels( void ){
 }
 
 int 
-cluster::set_matrix( particles coord_space ) {
+cluster0::set_matrix( particles coord_space ) {
 	int D = M_->size2;
 	if( M_->size2 == coord_space.size() && M_->size1 == DIM ) {
 		for(int i=0;i<D; i++){
@@ -371,7 +634,7 @@ clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw, fty
 }
 
 std::vector<int>			
-cluster_node::find_simple_relation( void ){
+cluster_node0::find_simple_relation( void ){
 	std::vector<std::pair<int,int > > residx;
 	std::vector<int> idx, sidx;
 	std::vector<ftyp > rmsds;
@@ -434,7 +697,7 @@ cluster_node::find_simple_relation( void ){
 }
 
 void
-cluster_node::assign_sub( cluster c1, cluster c2 ) {
+cluster_node0::assign_sub( cluster0 c1, cluster0 c2 ) {
 
 	int N,M;
 	if(c1.isSet()&&c2.isSet()){
@@ -451,7 +714,7 @@ cluster_node::assign_sub( cluster c1, cluster c2 ) {
 			particles px;
 			px	= cf.truncmat(M1,v1,ipart);
 			int D	= px.size();
-			richanalysis::cluster clpx;
+			richanalysis::cluster0 clpx;
 			clpx.alloc_space( D, 3 );	// THESE CENTOIDS SHOULD NOT BE USED
 			clpx.set_matrix( px );
 			clpx.perform_clustering();
@@ -468,7 +731,7 @@ cluster_node::assign_sub( cluster c1, cluster c2 ) {
 			particles px;
 			px	= cf.truncmat(M2,v2,ipart);
 			int D	= px.size();
-			richanalysis::cluster clpx;
+			richanalysis::cluster0 clpx;
 			clpx.alloc_space( D, 3 );	// THESE CENTOIDS SHOULD NOT BE USED
 			clpx.set_matrix( px );
 			clpx.perform_clustering();
@@ -480,7 +743,7 @@ cluster_node::assign_sub( cluster c1, cluster c2 ) {
 }
 
 particles 
-cluster_node::apply_rot_trans( particles px , int I){
+cluster_node0::apply_rot_trans( particles px , int I){
 
 	particles rpx;
 	for(int i=0;i<px.size();i++){
@@ -502,7 +765,7 @@ cluster_node::apply_rot_trans( particles px , int I){
 }
 
 particles 
-cluster_node::apply_rot_trans( particles px ){
+cluster_node0::apply_rot_trans( particles px ){
 	particles rpx;
 	for(int i=0;i<px.size();i++){
 		particle p0;
@@ -522,7 +785,7 @@ cluster_node::apply_rot_trans( particles px ){
 }
 
 void
-cluster_node::invert_transform( void ){
+cluster_node0::invert_transform( void ){
 	if( iU_->size1==U_->size1 && iU_->size2==U_->size2 && t_->size==it_->size){
 		invert_matrix(U_,iU_);
 		gsl_blas_dgemv(CblasNoTrans, -1.0, iU_, t_, 0.0, it_);
@@ -530,15 +793,15 @@ cluster_node::invert_transform( void ){
 }
 
 std::vector<int> 
-cluster_node::find_centroid_relation( void ){
+cluster_node0::find_centroid_relation( void ){
 	ftyp min_rmsd	= 1.0E10;
 
-	cluster c1 = parents_.first;
-	cluster c2 = parents_.second;
+	cluster0 c1 = parents_.first;
+	cluster0 c2 = parents_.second;
 
 	int N = c1.length_C();
 
-	if(N != c2.length_C())
+	if( N != c2.length_C())
 		std::cout << "ERROR IN IDX REL" << std::endl;
 
 	gmat *U		= gsl_matrix_calloc( DIM, DIM );
@@ -594,13 +857,7 @@ cluster_node::find_centroid_relation( void ){
 	}
 
 	bDirRel_=2*(c1.length_M()>c2.length_M())-1;
-/*
-	parents_.second.vc_
-	i -> vc_[i] push_back(vc_[i]), count -> nvc_[i]
-	// order of vc_ in idx_
-	check vc_[i]==idx_
-	super_idx_.push_back()
-*/
+
 	if(!have_transform())
 	{
 		gsl_matrix_memcpy (U_, Ut);
@@ -621,7 +878,7 @@ cluster_node::find_centroid_relation( void ){
 }
 
 ftyp
-cluster::find_shape(){
+cluster0::find_shape(){
 //	Do a single shape fit
 
 	if( isSet() ) { 
@@ -646,9 +903,8 @@ cluster::find_shape(){
 	return 0.0;
 }
 
-
 ftyp 
-cluster::shape(		gmat *P, gmat *U , gvec *t 	) 
+cluster0::shape(		gmat *P, gmat *U , gvec *t 	) 
 {	
 	if( !(	   P->size1 
 		&& U->size1 == U->size2 && U->size1 == P->size1 
@@ -704,7 +960,7 @@ cluster::shape(		gmat *P, gmat *U , gvec *t 	)
 }
 
 particle
-cluster::normal( void ){
+cluster0::normal( void ){
 	particle par;
 	if( has_shape() ){
 		gmat *Uc1	= gsl_matrix_calloc(DIM,DIM);
@@ -722,7 +978,7 @@ cluster::normal( void ){
 	}
 }
 particle
-cluster::center( void ){
+cluster0::center( void ){
 	if( has_shape() ){
 		gvec *tc	= gsl_vector_calloc(DIM);
 		copytc(tc);
@@ -734,7 +990,7 @@ cluster::center( void ){
 }
 
 ftyp			
-cluster_node::angle_between(cluster c1, cluster c2){
+cluster_node0::angle_between(cluster0 c1, cluster0 c2){
 
 	if( c1.has_shape() && c2.has_shape() ){
 		ftyp a,b,c,x,y,z;
@@ -775,7 +1031,7 @@ cluster_node::angle_between(cluster c1, cluster c2){
 
 
 std::pair<ftyp,ftyp >			
-cluster_node::angle_between(cluster c1, cluster c2, int I, int J){
+cluster_node0::angle_between(cluster0 c1, cluster0 c2, int I, int J){
 
 	std::pair<ftyp,ftyp > ang_dist;
 
@@ -820,7 +1076,7 @@ cluster_node::angle_between(cluster c1, cluster c2, int I, int J){
 }
 
 std::vector<int>
-cluster_node::global_fragment_order( void )
+cluster_node0::global_fragment_order( void )
 {
 	std::vector<int> at_order, tmp_order;
 
@@ -854,7 +1110,7 @@ cluster_node::global_fragment_order( void )
 }
 
 std::pair<particles, std::vector<int> >
-cluster_node::apply_fragment_trans( particles coords , std::vector<int> p_ndx)
+cluster_node0::apply_fragment_trans( particles coords , std::vector<int> p_ndx)
 {
 	std::pair<particles, std::vector<int> > p_id;
 	if( idx_.size() == vc1_.size() && vc2_.size() == vc1_.size() && p_ndx.size()==coords.size() ) {
@@ -911,7 +1167,7 @@ cluster_node::apply_fragment_trans( particles coords , std::vector<int> p_ndx)
 }
 
 particles 
-cluster_node::assign_particles(void){
+cluster_node0::assign_particles(void){
 	particles ps;
 	if(idx_.size() == vc2_.size()  ) {
 		for(int i=0;i<vc2_.size();i++){

@@ -38,6 +38,29 @@
 //L  The GNU Lesser General Public can also be obtained by writing to the
 //L  Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
 //L  MA 02111-1307 USA
+////
+/*
+ typedef std::pair<cluster, cluster> node
+ typedef std::vector<node > layer
+
+N = number of particles
+while solvedlayer size != N
+	get node from old layer
+	new layer = mean_cluster_alignment_algorithm( node )
+	if node small set length is one
+		push on solved layer
+	else
+		push on current layer
+	swap current layer with old
+	clear current
+
+
+mean_cluster_alignment_algorithm( node )
+	3-means
+	find centroid relation
+	return layer
+*/
+////
 
 #include "richtypes.h"
 #include "simple.hh"
@@ -59,9 +82,76 @@ namespace richanalysis {
 			int connectivity( gmat * , ftyp val );
 	};
 
-	class cluster : public clustering, public linalg, public tensorIO {
+	class cluster :  public clustering, public tensorIO {
 		public:
-			cluster() { 	bSet_[0]=0; bSet_[1]=0; bSet_[2]=0; bSet_[3]=0; bPCset_=0;
+			cluster() { 	bSet_ = false; };
+			void		alloc_space ( int, int ); // model_N and cent_N
+			int		set_matrix( particles ); 
+			int		find_centroids( void );
+			std::vector<int>	get_labels( void );
+		//
+			void		copyC(gmat *C0) { 
+						if(C0->size1==C_->size1&&C0->size2==C_->size2) { gsl_matrix_memcpy(C0, C_); } 
+					};
+			void		copyM(gmat *M0) { 
+						if(M0->size1==M_->size1&&M0->size2==M_->size2) { gsl_matrix_memcpy(M0, M_); } 
+					};
+			void		copyv(gvec *v0) { 
+						if(v0->size ==vc_->size) { gsl_vector_memcpy(v0, vc_); } 
+					};
+			void		copyw(gvec *w0) { 
+						if(w0->size ==wc_->size) { gsl_vector_memcpy(w0, wc_); } 
+					};
+
+			void		writev(gvec *v0) { 
+						if(v0->size ==vc_->size) { gsl_vector_memcpy(vc_, v0); } 
+					};
+
+			int		length_C(void){ return C_->size2; };
+			int		length_M(void){ return M_->size2; };
+			bool		isSet() { return ( bSet_ ); };		
+		private:
+			gmat	*M_; 		// 0 THE ORIGINAL COORDINATES 
+			gmat	*C_; 		// 1 THE CENTROIDS
+			gvec	*vc_;		// 0 UNSORTED LABELS
+			gvec	*wc_;		// 1 UNSORTED LABELS
+			int	bSet_;
+			std::vector<int>	inOrder_;
+			std::vector<int>	NperC_;
+	};
+	
+	typedef std::pair< cluster, cluster > node;
+	typedef std::vector< node > layer;
+
+	class node_analysis : public fitting {
+		public:
+			node_analysis() { bNode_ = false; bLayer_ = false; };
+			node_analysis( node n ) { bNode_ = assign_node( n ); bLayer_ = bNode_; };
+			std::vector< int >	find_centroid_relation( void );
+			bool			find_index_orders(void);
+			std::vector< int >	global_index_order ( void ) { return glob_idx_order_; };
+			std::vector< int >	cluster_index_order( void ) { return cidx_; };
+			std::pair<int,int>	size(void){ std::pair<int,int> pi; 
+							pi.first=parents_.first.length_M();
+							pi.second=parents_.second.length_M();
+							return pi; };
+			bool			assign_node( node n );
+			bool			allSet() { return ( bNode_ && bLayer_ ); };
+			layer			mean_cluster_alignment_algorithm( void ){ return children_; };			
+			~node_analysis(){};
+		private:
+			node	parents_;
+			layer	children_;
+			bool bNode_; bool bLayer_;
+			std::vector<int>  idx_;
+			std::vector<int> iidx_;
+			std::vector<int> cidx_;
+			std::vector<int> glob_idx_order_;
+	};
+
+	class cluster0 : public clustering, public linalg, public tensorIO {
+		public:
+			cluster0() { 	bSet_[0]=0; bSet_[1]=0; bSet_[2]=0; bSet_[3]=0; bPCset_=0;
 					Uc_  = gsl_matrix_calloc( DIM, DIM );	tc_ = gsl_vector_calloc( DIM ); 
 					Axis_ = gsl_vector_calloc( DIM );	Euler_ = gsl_vector_calloc( DIM ); };
 
@@ -98,7 +188,7 @@ namespace richanalysis {
 			bool			has_shape(void){return (bPCset_==1); };
 			particle		normal(void);
 			particle		center(void);
-			~cluster() {}
+			~cluster0() {}
 	private:
 		gmat	*M_; 		// 0 THE ORIGINAL COORDINATES 
 		gmat	*C_; 		// 1 THE CENTROIDS
@@ -115,13 +205,13 @@ namespace richanalysis {
 		int bPCset_;
 	};
 
-	class cluster_node : public fitting {
+	class cluster_node0 : public fitting {
 		public:
-			cluster_node() { bDirRel_=0; bUtSet_=0; subSet_=0;
+			cluster_node0() { bDirRel_=0; bUtSet_=0; subSet_=0;
 					U_  = gsl_matrix_calloc( DIM, DIM );  t_ = gsl_vector_calloc( DIM ); 
 					iU_ = gsl_matrix_calloc( DIM, DIM ); it_ = gsl_vector_calloc( DIM ); sgn_=1; }
 
-			void			assign_sub( cluster c1, cluster c2 );
+			void			assign_sub( cluster0 c1, cluster0 c2 );
 			bool			subSet() { return (subSet_==1); };
 
 			std::vector<int>	find_centroid_relation( void );
@@ -141,12 +231,12 @@ namespace richanalysis {
 			void			invert_transform(void);
 			void			printUt(void){  output_matrix(U_); output_vector(t_); };
 			void			printiUt(void){ output_matrix(iU_);output_vector(it_);};
-			ftyp			angle_between(cluster c1, cluster c2);
-			std::pair<ftyp, ftyp >	angle_between(cluster c1, cluster c2, int i, int j);
+			ftyp			angle_between(cluster0 c1, cluster0 c2);
+			std::pair<ftyp, ftyp >	angle_between(cluster0 c1, cluster0 c2, int i, int j);
 		private:
 			int subSet_;
-			std::pair<richanalysis::cluster, richanalysis::cluster > parents_;
-			std::vector<richanalysis::cluster > vc1_, vc2_; // subclusters
+			std::pair<richanalysis::cluster0, richanalysis::cluster0 > parents_;
+			std::vector<richanalysis::cluster0 > vc1_, vc2_; // subclusters
 			int bDirRel_;
 			std::vector<int> idx_;		// clusters
 			std::vector<int> iidx_;		// clusters

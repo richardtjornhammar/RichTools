@@ -191,12 +191,12 @@ int main (int argc, char **argv) {
 
 	richanalysis::fileIO fIO;
 	particles coord_space, carth_space;
-	int N		= 10;
+	int N		= 3;
 	bool bFit	= true;
 
 	switch( argc ) {
-		case 4: {
-			        std::string tmpline( argv[3] );
+		case 3: {
+			        std::string tmpline( argv[2] );
 				filename[1] = tmpline;
                                 std::size_t found = tmpline.find(ext);
                                 if (found!=std::string::npos){
@@ -209,12 +209,13 @@ int main (int argc, char **argv) {
 					}
                                 }
 			}
-		case 3: {
+/*		case 3: {
 				N=atoi(argv[2]);
 				bFit=(N>=0);
 				if(!bFit)
 					N*=-1;
 			}
+*/
 		case 2: {
 				std::string tmpline( argv[1] );
 				filename[0] = tmpline;
@@ -234,13 +235,25 @@ int main (int argc, char **argv) {
 			std::cout << "FATAL:: FAILED TO OPEN FILE" << std::endl;
 			return(1);
 	}
+
 	std::string ns	= std::to_string(N);
 
 	int D		= coord_space.size();
 	int B		= carth_space.size();
 
-	richanalysis::cluster cl1, cl2, cl_test_d, cl_test_m;
+	richanalysis::node n0;
+	n0.first.set_matrix(coord_space);
+	n0.second.set_matrix(carth_space);
 
+	richanalysis::node_analysis n_ana(n0);
+
+	std::vector<int> clu_ndx = n_ana.cluster_index_order();
+	fIO.output_pdb("clustered"+ns+".pdb" , carth_space  , clu_ndx ); 
+
+	std::vector<int> den_ndx = n0.first.get_labels();
+	fIO.output_pdb("den-nofit-n"+ns+".pdb", coord_space , den_ndx );
+
+/*
 	cl1.alloc_space(D,N); 
 	cl2.alloc_space(B,N);
 
@@ -260,7 +273,7 @@ int main (int argc, char **argv) {
 	std::vector<int> idx1,idx2;
 
 	fIO.output_pdb("mod-nofit-n"+ns+".pdb", carth_space , crd_ndx);
-	fIO.output_pdb("den-nofit-n"+ns+".pdb", coord_space , den_ndx);
+
 
 	if(!bFit){
 // NCULSTS 1/12 with H 1/8 without
@@ -327,6 +340,7 @@ int main (int argc, char **argv) {
 
 	std::vector<int> at_order = nidx.global_fragment_order();
 	fIO.output_pdb("frag-rel-n"+ns+".pdb" , pf_id.first  , pf_id.second , at_order);
-
+*/
+	
 	return 0;
 }
