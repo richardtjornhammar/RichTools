@@ -137,7 +137,7 @@ namespace richanalysis {
 							return pi; };
 			bool			assign_node( node n );
 			bool			allSet() { return ( bNode_ && bLayer_ ); };
-			layer			get_node_layer( void ){ return children_; };			
+			layer			mean_cluster_alignment_algorithm( void ){ return children_; };			
 			~node_analysis(){};
 		private:
 			node	parents_;
