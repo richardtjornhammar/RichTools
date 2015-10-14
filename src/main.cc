@@ -249,8 +249,7 @@ int main (int argc, char **argv) {
 	int sw = (B>=D)+1;
 	old_layer.push_back(n0);
 
-//	while( solved_layer.size() != carth_space.size() )
-	for( int I=0;I<5;I++ )
+	while( solved_layer.size() != carth_space.size() )
 	{
 		richanalysis::layer current_layer;
 		current_layer.clear();
@@ -262,10 +261,8 @@ int main (int argc, char **argv) {
 			std::pair<int,int> S = anode.size();
 			if ( ( S.first==1 ) || ( S.second==1 ) )
 			{
-				std::cout << "INFOT::" << S.first << " " << S.second << std::endl;
 				solved_layer.push_back(	wnode );
 			} else {
-				std::cout << "INFOF::" << S.first << " " << S.second << std::endl;
 				richanalysis::layer new_layer	= anode.get_node_layer();
 				current_layer.insert( current_layer.end() , new_layer.begin() , new_layer.end() );
 			}
@@ -278,28 +275,31 @@ int main (int argc, char **argv) {
 
 		}
 //	FIND ALL THE SIZE ONE NODES AND PUSH ON SOLVED
-
 		while( !current_layer.empty() )
 		{
 			richanalysis::node wnode	= current_layer.back(); 
 			current_layer.pop_back();
 			richanalysis::node_analysis 	anode(wnode);
 			std::pair<int,int> S = anode.size();
-//			if ( ( S.first==1 && sw==1 ) || ( S.second==1 && sw == 2) )
+
 			if ( ( S.first==1 ) || ( S.second==1 ) )
 			{
 				solved_layer.push_back(	wnode );
-			} else {
+			} 
+			else 
+			{
 				old_layer.push_back(	wnode );
 			}
+
 		}
 	}
 	std::cout << "INFO::SIZE::" << "SOLVED:: " << solved_layer.size() << " CS " << carth_space.size() << std::endl;
 	for( int i=0 ; i<solved_layer.size() ; i++ ) {
 		if(solved_layer[i].first.isSet())
-			std::cout << "INFO::SOLVED::"<< i << "f>>" << solved_layer[i].first.length_M()  << std::endl;
+			std::cout << "INFO::SOLVED::"<< i << " <<f>> " << solved_layer[i].first.length_M();
 		if(solved_layer[i].second.isSet())
-			std::cout << "INFO::SOLVED::"<< i << "s>>" << solved_layer[i].second.length_M()  << std::endl;
+			std::cout << " <<s>> " << solved_layer[i].second.length_M();
+		  std::cout << std::endl;
 	}
 /*
 	cl1.alloc_space(D,N); 

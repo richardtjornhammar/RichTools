@@ -145,9 +145,9 @@ node_analysis::assign_node( node n ) {
 			std::vector<int> vi;
 			vi = find_centroid_relation(); 
 
-			gmat *M1 = gsl_matrix_calloc(rDIM,L);
+			gmat *M1 = gsl_matrix_calloc(DIM,L);
 			gvec *v1 = gsl_vector_calloc(L);
-			gmat *M2 = gsl_matrix_calloc(rDIM,N);
+			gmat *M2 = gsl_matrix_calloc(DIM,N);
 			gvec *v2 = gsl_vector_calloc(N);
 			c2.copyM(M2); c2.copyv(v2);
 			c1.copyM(M1); c1.copyv(v1);
