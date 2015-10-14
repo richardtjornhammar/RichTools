@@ -38,29 +38,6 @@
 //L  The GNU Lesser General Public can also be obtained by writing to the
 //L  Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
 //L  MA 02111-1307 USA
-////
-/*
- typedef std::pair<cluster, cluster> node
- typedef std::vector<node > layer
-
-N = number of particles
-while solvedlayer size != N
-	get node from old layer
-	new layer = mean_cluster_alignment_algorithm( node )
-	if node small set length is one
-		push on solved layer
-	else
-		push on current layer
-	swap current layer with old
-	clear current
-
-
-mean_cluster_alignment_algorithm( node )
-	3-means
-	find centroid relation
-	return layer
-*/
-////
 
 #include "richtypes.h"
 #include "simple.hh"
@@ -84,7 +61,7 @@ namespace richanalysis {
 
 	class cluster :  public clustering, public tensorIO {
 		public:
-			cluster() { 	bSet_ = false; };
+			cluster() { 	bSet_ = false; rDIM_=DIM; };
 			void		alloc_space ( int, int ); // model_N and cent_N
 			int		set_matrix( particles ); 
 			int		find_centroids( void );
@@ -106,7 +83,8 @@ namespace richanalysis {
 			void		writev(gvec *v0) { 
 						if(v0->size ==vc_->size) { gsl_vector_memcpy(vc_, v0); } 
 					};
-
+			int		get_cDIM(void) { return rDIM_; }; // centroid dimension
+			void		set_cDIM(int rDIM) { rDIM_=rDIM; };// centroid dimension
 			int		length_C(void){ return C_->size2; };
 			int		length_M(void){ return M_->size2; };
 			bool		isSet() { return ( bSet_ ); };		
@@ -118,6 +96,7 @@ namespace richanalysis {
 			int	bSet_;
 			std::vector<int>	inOrder_;
 			std::vector<int>	NperC_;
+			int	rDIM_;
 	};
 	
 	typedef std::pair< cluster, cluster > node;
@@ -126,7 +105,7 @@ namespace richanalysis {
 	class node_analysis : public fitting {
 		public:
 			node_analysis() { bNode_ = false; bLayer_ = false; };
-			node_analysis( node n ) { bNode_ = assign_node( n ); bLayer_ = bNode_; };
+			node_analysis( node n ) { bNode_ = assign_node( n ); };
 			std::vector< int >	find_centroid_relation( void );
 			bool			find_index_orders(void);
 			std::vector< int >	global_index_order ( void ) { return glob_idx_order_; };
@@ -136,7 +115,9 @@ namespace richanalysis {
 							pi.second=parents_.second.length_M();
 							return pi; };
 			bool			assign_node( node n );
-			bool			allSet() { return ( bNode_ && bLayer_ ); };
+			bool			allSet()	{ return ( bNode_ && bLayer_ ); };
+			bool			haveNode()	{ return ( bNode_); };
+			bool			haveLayer()	{ return ( bLayer_ ); };
 			layer			get_node_layer( void ){ return children_; };			
 			~node_analysis(){};
 		private:

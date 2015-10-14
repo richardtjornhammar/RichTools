@@ -50,7 +50,7 @@ void
 cluster::alloc_space( int D1, int D2 ) {
 //D1	COORDINATE	SPACE
 //D2	CENTROID	SPACE
-	if( D1 >= D2 ) {
+	if( D1 > 0 && D2 > 0 ) {
 		M_	= gsl_matrix_calloc( DIM, D1 );	// MODEL
 		C_	= gsl_matrix_calloc( DIM, D2 );	// DATA
 		vc_	= gsl_vector_calloc( D1 );
@@ -63,10 +63,12 @@ cluster::alloc_space( int D1, int D2 ) {
 
 int 
 cluster::set_matrix( particles coord_space ) {
-	int D = coord_space.size();
-	int reval=-1;
+	int D		= coord_space.size();
+	int reval	=	-1;
+
+	int rD = get_cDIM();
 	if( bSet_ == 0 ) {
-		alloc_space(D,3);
+		alloc_space(D,rD);
 	}
 	if( M_->size2 == coord_space.size() && M_->size1 == DIM && bSet_ ) {
 		for(int i=0;i<D; i++){
@@ -76,9 +78,11 @@ cluster::set_matrix( particles coord_space ) {
 		gsl_vector_set_all ( vc_ , 1.0 );
 		reval =0; 
 	} else {
-		std::cout << "ERROR:: BAD CONTAINER LENGTHS:: calc_distance_matrix" << std::endl;
+		std::cout << "ERROR:: BAD CONTAINER LENGTHS:: set_matrix" 
+			<< D << " " << rD << " " << M_->size2 << std::endl;
 	}
-	find_centroids();
+	if(rD>1)
+		find_centroids();
 
 	return  reval;
 }
@@ -117,20 +121,31 @@ node_analysis::assign_node( node n ) {
 	cluster c2 = n.second;
 	std::vector<int> cindx;
 
-	int N, M, L;
+	int N, M, L, K;
+	int rDIM=c1.get_cDIM(); // restriction
+
+	if( c1.get_cDIM() != c2.get_cDIM() ){
+		std::cout << "ERROR WITH DIMENSION OF CLUSTER PAIRS" << std::endl;
+		bNode_=false; bLayer_=false;
+		return false;
+	}
+
 	if( c1.isSet() && c2.isSet() ) {
 		parents_.first  = c1;
 		parents_.second = c2;
-		std::vector<int> vi;
-		vi = find_centroid_relation(); 
+		L = c1.length_M();
+		N = c2.length_M();
+		M = c2.length_C();
+		K = c1.length_C();
 
-		if( c1.length_C() == c2.length_C() && c1.length_C() == 3 ) {
-			L = c1.length_M();
-			N = c2.length_M();
-			M = c2.length_C();
-			gmat *M1 = gsl_matrix_calloc(DIM,L);
+		if( K == M && M == rDIM && rDIM>1 ) {
+
+			std::vector<int> vi;
+			vi = find_centroid_relation(); 
+
+			gmat *M1 = gsl_matrix_calloc(rDIM,L);
 			gvec *v1 = gsl_vector_calloc(L);
-			gmat *M2 = gsl_matrix_calloc(DIM,N);
+			gmat *M2 = gsl_matrix_calloc(rDIM,N);
 			gvec *v2 = gsl_vector_calloc(N);
 			c2.copyM(M2); c2.copyv(v2);
 			c1.copyM(M1); c1.copyv(v1);
@@ -143,7 +158,7 @@ node_analysis::assign_node( node n ) {
 			}
 			parents_.second.writev(v2);
 			cidx_.swap(cindx);
-
+			bLayer_ = false;
 			for( int ipart=0 ; ipart<M ; ipart++ ) { // M CLUSTERS
 				richanalysis::coord_format cf;
 				particles px,py;
@@ -151,22 +166,25 @@ node_analysis::assign_node( node n ) {
 				py	= cf.truncmat(M2, v2, ipart);
 				int D	= px.size();
 				int B	= py.size();
-
-				richanalysis::cluster clpx,clpy;	
-				clpx.set_matrix( px );
-				clpx.find_centroids();	
-				clpy.set_matrix( py );
-				clpy.find_centroids();
+				int rD	= (B<DIM)?((B>0)?(B):(-1)):((D<DIM)?((D>0)?(D):(-1)):(DIM));
 				node child;
-				child.first	= clpx;
-				child.second	= clpy;
+				if( rD > 0 ) {
+					richanalysis::cluster clpx,clpy;
+					clpx.set_cDIM(rD); clpy.set_cDIM(rD);	
+					clpx.set_matrix( px );
+					clpy.set_matrix( py );
+					child.first	= clpx;
+					child.second	= clpy;
+					bLayer_ = true;	
+				}
 				children_.push_back(child);
 			}
-			bNode_ = true;
 		} else {
-			std::cout << "ERROR::ERROR" << std::endl;
-			bNode_ = false;
+			bLayer_= false;
 		}
+		bNode_ = true;
+	}else{
+		bNode_ = false;
 	}
 
 	return bNode_;

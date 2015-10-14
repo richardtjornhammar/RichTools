@@ -242,20 +242,55 @@ int main (int argc, char **argv) {
 	int B		= carth_space.size();
 
 	richanalysis::layer old_layer;
+	richanalysis::layer solved_layer;
 	richanalysis::node n0;
 	n0.first.set_matrix(coord_space);
 	n0.second.set_matrix(carth_space);
+	int sw = (B>=D)+1;
 	old_layer.push_back(n0);
 
+	while( solved_layer.size() != carth_space.size() )
 	{
-		old_layer.back();
-		richanalysis::node work_node	=	old_layer.pop_back();
-		richanalysis::node_analysis n_ana(work_node);
-		std::vector<int> clu_ndx = n_ana.cluster_index_order();
-		std::vector<int> den_ndx = n0.first.get_labels();
-		fIO.output_pdb("clustered"+ns+".pdb" , carth_space  , clu_ndx ); 
-		fIO.output_pdb("den-nofit-n"+ns+".pdb", coord_space , den_ndx );
-		richanalysis::layer new_layer = n_ana.get_node_layer();
+		richanalysis::layer current_layer;
+		while( !old_layer.empty() )
+		{
+
+			richanalysis::node wnode	= old_layer.back();
+			old_layer.pop_back();
+			richanalysis::node_analysis 	anode(wnode);
+			richanalysis::layer new_layer = anode.get_node_layer();
+			current_layer.insert( current_layer.end() , new_layer.begin() , new_layer.end() );
+
+			if( false ) {
+				std::vector<int> clu_ndx 	= anode.cluster_index_order();
+				std::vector<int> den_ndx 	= n0.first.get_labels();
+				fIO.output_pdb("clustered"+ns+".pdb" , carth_space  , clu_ndx ); 
+				fIO.output_pdb("den-nofit-n"+ns+".pdb", coord_space , den_ndx );
+			}
+		}
+//	FIND ALL THE SIZE ONE NODES AND PUSH ON SOLVED
+
+		while( !current_layer.empty() )
+		{
+			richanalysis::node wnode	= current_layer.back(); 
+			current_layer.pop_back();
+			richanalysis::node_analysis 	anode(wnode);
+			std::pair<int,int> S = anode.size();
+//			if ( ( S.first==1 && sw==1 ) || ( S.second==1 && sw == 2) )
+			if ( ( S.first==1 ) || ( S.second==1 ) )
+			{
+				solved_layer.push_back(	wnode );
+			} else {
+				old_layer.push_back(	wnode );
+			}
+		}
+	}
+	std::cout << "INFO::SIZE::" << "SOLVED:: " << solved_layer.size() << " CS " << carth_space.size() << std::endl;
+	for( int i=0 ; i<solved_layer.size() ; i++ ) {
+		if(solved_layer[i].first.isSet())
+			std::cout << "INFO::SOLVED::"<< i << "f>>" << solved_layer[i].first.length_M()  << std::endl;
+		if(solved_layer[i].second.isSet())
+			std::cout << "INFO::SOLVED::"<< i << "s>>" << solved_layer[i].second.length_M()  << std::endl;
 	}
 /*
 	cl1.alloc_space(D,N); 
