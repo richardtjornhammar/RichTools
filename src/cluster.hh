@@ -130,6 +130,16 @@ namespace richanalysis {
 			std::vector<int> glob_idx_order_;
 	};
 
+	class layer_analysis : public fileIO {
+		public:
+			layer_analysis(){ bSet_ = false; };
+			layer_analysis(layer l){ bSet_ = true; own_=l; };
+			void output_layer( std::string );
+		private:
+			layer	own_;
+			bool	bSet_;
+	};
+
 	class cluster0 : public clustering, public linalg, public tensorIO {
 		public:
 			cluster0() { 	bSet_[0]=0; bSet_[1]=0; bSet_[2]=0; bSet_[3]=0; bPCset_=0;
