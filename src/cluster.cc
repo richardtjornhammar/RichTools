@@ -117,10 +117,12 @@ cluster::get_labels( void ){
 bool
 node_analysis::assign_node( node n ) {
 
+	n.first.find_centroids();
+	n.second.find_centroids();
 	cluster c1 = n.first;
 	cluster c2 = n.second;
 	std::vector<int> cindx;
-
+	
 	int N, M, L, K;
 	int rDIM=c1.get_cDIM(); // restriction
 

@@ -249,24 +249,33 @@ int main (int argc, char **argv) {
 	int sw = (B>=D)+1;
 	old_layer.push_back(n0);
 
-	while( solved_layer.size() != carth_space.size() )
+//	while( solved_layer.size() != carth_space.size() )
+	for( int I=0;I<5;I++ )
 	{
 		richanalysis::layer current_layer;
+		current_layer.clear();
 		while( !old_layer.empty() )
 		{
-
 			richanalysis::node wnode	= old_layer.back();
 			old_layer.pop_back();
-			richanalysis::node_analysis 	anode(wnode);
-			richanalysis::layer new_layer = anode.get_node_layer();
-			current_layer.insert( current_layer.end() , new_layer.begin() , new_layer.end() );
-
+			richanalysis::node_analysis	anode(wnode);
+			std::pair<int,int> S = anode.size();
+			if ( ( S.first==1 ) || ( S.second==1 ) )
+			{
+				std::cout << "INFOT::" << S.first << " " << S.second << std::endl;
+				solved_layer.push_back(	wnode );
+			} else {
+				std::cout << "INFOF::" << S.first << " " << S.second << std::endl;
+				richanalysis::layer new_layer	= anode.get_node_layer();
+				current_layer.insert( current_layer.end() , new_layer.begin() , new_layer.end() );
+			}
 			if( false ) {
-				std::vector<int> clu_ndx 	= anode.cluster_index_order();
-				std::vector<int> den_ndx 	= n0.first.get_labels();
+				std::vector<int> clu_ndx	= anode.cluster_index_order();
+				std::vector<int> den_ndx	= n0.first.get_labels();
 				fIO.output_pdb("clustered"+ns+".pdb" , carth_space  , clu_ndx ); 
 				fIO.output_pdb("den-nofit-n"+ns+".pdb", coord_space , den_ndx );
 			}
+
 		}
 //	FIND ALL THE SIZE ONE NODES AND PUSH ON SOLVED
 
