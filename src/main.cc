@@ -242,6 +242,7 @@ int main (int argc, char **argv) {
 	int sw = (B>=D)+1;
 	old_layer.push_back(n0);
 
+	int C = 0;
 	while( solved_layer.size() != carth_space.size() )
 	{
 		richanalysis::layer current_layer;
@@ -259,40 +260,31 @@ int main (int argc, char **argv) {
 				richanalysis::layer new_layer	= anode.get_node_layer();
 				current_layer.insert( current_layer.end() , new_layer.begin() , new_layer.end() );
 			}
-			if( false ) {
+			if( C++ == 1 ) {
 				std::vector<int> clu_ndx	= anode.cluster_index_order();
+				std::cout << " HAVE NDX SIZE " << clu_ndx.size() << std::endl; 
 				std::vector<int> den_ndx	= n0.first.get_labels();
-				fIO.output_pdb("clustered"+ns+".pdb" , carth_space  , clu_ndx ); 
-				fIO.output_pdb("den-nofit-n"+ns+".pdb", coord_space , den_ndx );
+				fIO.output_pdb("clu-nofit-n" + ns + ".pdb", carth_space , clu_ndx ); 
+				fIO.output_pdb("den-nofit-n" + ns + ".pdb", coord_space , den_ndx );
 			}
-
 		}
-//	FIND ALL THE SIZE ONE NODES AND PUSH ON SOLVED
+
 		while( !current_layer.empty() )
 		{
 			richanalysis::node wnode	= current_layer.back(); 
 			current_layer.pop_back();
 			richanalysis::node_analysis 	anode(wnode);
 			std::pair<int,int> S = anode.size();
-
+			
 			if ( ( S.first==1 ) || ( S.second==1 ) )
 			{
 				solved_layer.push_back(	wnode );
-			} 
-			else 
+			}
+			else
 			{
 				old_layer.push_back(	wnode );
 			}
-
 		}
-	}
-	std::cout << "INFO::SIZE::" << "SOLVED:: " << solved_layer.size() << " CS " << carth_space.size() << std::endl;
-	for( int i=0 ; i<solved_layer.size() ; i++ ) {
-		if(solved_layer[i].first.isSet())
-			std::cout << "INFO::SOLVED::"<< i << " <<f>> " << solved_layer[i].first.length_M();
-		if(solved_layer[i].second.isSet())
-			std::cout << " <<s>> " << solved_layer[i].second.length_M();
-		  std::cout << std::endl;
 	}
 
 	richanalysis::layer_analysis	alayer(solved_layer);

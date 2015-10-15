@@ -51,12 +51,13 @@ namespace richanalysis {
 
 	class coord_format {
 		public:
-			particles	mat2par( gmat*, gvec*);
+			particles	mat2par ( gmat*, gvec*	);
 			// SHOULD IMPLEMENT ONE WICH RETURNS VECTOR OF PARTICLES ORDERED ON NDX (BELOW)
-			particles	par2par( particles, std::vector<int> , int );
-			gmat		par2mat( particles );
-			particles	app_par( particles , particles );
-			particles	truncmat( gmat* , gvec*, int );
+			particles	par2par ( particles, std::vector<int> , int );
+			gmat		par2mat ( particles 	);
+			particles	app_par ( particles , particles	);
+			particles	truncmat( gmat*	, gvec* , int	);
+			ids		truncIDs( ids	, gvec* , int	);
 	};
 }
 #endif

@@ -71,9 +71,13 @@ cluster::set_matrix( particles coord_space ) {
 		alloc_space(D,rD);
 	}
 	if( M_->size2 == coord_space.size() && M_->size1 == DIM && bSet_ ) {
-		for(int i=0;i<D; i++){
-			inOrder_.push_back(i);
-			gsl_matrix_set_col ( M_ , i, coord_space[i].second );
+		id inInfo;
+		idlabels_.clear();
+		for(int i=0;i<D; i++) {
+			inInfo.first	= i;
+			inInfo.second	= coord_space[i].first;
+			idlabels_.push_back ( inInfo );
+			gsl_matrix_set_col  ( M_ , i, coord_space[i].second );
 		}
 		gsl_vector_set_all ( vc_ , 1.0 );
 		reval =0; 
@@ -124,11 +128,11 @@ node_analysis::assign_node( node n ) {
 	std::vector<int> cindx;
 	
 	int N, M, L, K;
-	int rDIM=c1.get_cDIM(); // restriction
+	int rDIM=c1.get_cDIM();
 
-	if( c1.get_cDIM() != c2.get_cDIM() ){
+	if( c1.get_cDIM() != c2.get_cDIM() ) {
 		std::cout << "ERROR WITH DIMENSION OF CLUSTER PAIRS" << std::endl;
-		bNode_=false; bLayer_=false;
+		bNode_= false; bLayer_= false;
 		return false;
 	}
 
@@ -151,6 +155,9 @@ node_analysis::assign_node( node n ) {
 			gvec *v2 = gsl_vector_calloc(N);
 			c2.copyM(M2); c2.copyv(v2);
 			c1.copyM(M1); c1.copyv(v1);
+			ids IDX,IDY;
+			IDX = c1.getIDs();
+			IDY = c2.getIDs();
 			for(int i=0;i<v2->size;i++){
 				double val = gsl_vector_get(v2,i);
 				int ival = (int)round(val);
@@ -163,9 +170,12 @@ node_analysis::assign_node( node n ) {
 			bLayer_ = false;
 			for( int ipart=0 ; ipart<M ; ipart++ ) { // M CLUSTERS
 				richanalysis::coord_format cf;
-				particles px,py;
-				px	= cf.truncmat(M1, v1, ipart);
-				py	= cf.truncmat(M2, v2, ipart);
+				particles	px, py;
+				ids		idx, idy;
+				px	= cf.truncmat( M1, v1, ipart);
+				idx	= cf.truncIDs(IDX, v1, ipart);
+				py	= cf.truncmat( M2, v2, ipart);
+				idy	= cf.truncIDs(IDY, v2, ipart);
 				int D	= px.size();
 				int B	= py.size();
 				int rD	= (B<DIM)?((B>0)?(B):(-1)):((D<DIM)?((D>0)?(D):(-1)):(DIM));
@@ -176,7 +186,9 @@ node_analysis::assign_node( node n ) {
 					clpx.set_matrix( px );
 					clpy.set_matrix( py );
 					child.first	= clpx;
+					child.first.setIDs(idx);
 					child.second	= clpy;
+					child.second.setIDs(idy);
 					bLayer_ = true;	
 				}
 				children_.push_back(child);
@@ -334,27 +346,38 @@ layer_analysis::output_layer ( std::string filename ) {
 		int N = own_.size();
 		bool bFirst=true;
 		particles ps;
+
+		ids glob_ids;
 		for(int i=0;i<N;i++){
+			ids	ids1, ids2;
+			ids1		= own_[i].first.getIDs();
+			ids2		= own_[i].second.getIDs();
 			bFirst 		= own_[i].first.length_M()>=own_[i].second.length_M();
 			cluster c_d 	= bFirst?own_[i].first:own_[i].second;
 			int	N_d 	= bFirst?own_[i].first.length_M():own_[i].second.length_M();
-			gsl_matrix *m = gsl_matrix_alloc(DIM,N_d);
-			gsl_vector *v = gsl_vector_calloc(DIM);
-			gsl_vector *w = gsl_vector_calloc(DIM);
+			gsl_matrix *m	= gsl_matrix_alloc(DIM,N_d);
+			gsl_vector *v	= gsl_vector_calloc(DIM);
+			gsl_vector *w	= gsl_vector_calloc(DIM);
 			c_d.copyM(m);
 			for(int j=0;j<N_d;j++){
-				gsl_matrix_get_col ( v,m,j );
-				gsl_vector_add(w,v);
+				gsl_matrix_get_col ( v, m, j );
+				gsl_vector_add( w, v );
 			}
 			gsl_vector_scale(w,1.0/((float)(N_d)));
 			particle p;
-			p.first  = "C";
-			p.second = gsl_vector_alloc(DIM);
+			id identity	=	bFirst?(ids2[0]):(ids1[0]);
+			p.first  	=	identity.second;
+			glob_ids.push_back(	identity	);
+			p.second 	= gsl_vector_alloc(DIM);
 			gsl_vector_memcpy(p.second,w);
 			ps.push_back(p);
-			gsl_matrix_free(m); gsl_vector_free(v); gsl_vector_free(w);
+			gsl_matrix_free(m);
+			gsl_vector_free(v);
+			gsl_vector_free(w);
 		}
 		output_pdb( filename , ps );
+//		for(int i=0;i<glob_ids.size();i++)
+//			std::cout << " SCRAMBLED " << glob_ids[i].first << " " << glob_ids[i].second << std::endl;
 	}
 }
 

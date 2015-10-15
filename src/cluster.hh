@@ -62,11 +62,11 @@ namespace richanalysis {
 	class cluster :  public clustering, public tensorIO {
 		public:
 			cluster() { 	bSet_ = false; rDIM_=DIM; };
-			void		alloc_space ( int, int ); // model_N and cent_N
+			void		alloc_space ( int, int );	//	model_N and cent_N
 			int		set_matrix( particles ); 
 			int		find_centroids( void );
 			std::vector<int>	get_labels( void );
-		//
+
 			void		copyC(gmat *C0) { 
 						if(C0->size1==C_->size1&&C0->size2==C_->size2) { gsl_matrix_memcpy(C0, C_); } 
 					};
@@ -83,19 +83,22 @@ namespace richanalysis {
 			void		writev(gvec *v0) { 
 						if(v0->size ==vc_->size) { gsl_vector_memcpy(vc_, v0); } 
 					};
-			int		get_cDIM(void) { return rDIM_; }; // centroid dimension
-			void		set_cDIM(int rDIM) { rDIM_=rDIM; };// centroid dimension
-			int		length_C(void){ return C_->size2; };
-			int		length_M(void){ return M_->size2; };
-			bool		isSet() { return ( bSet_ ); };		
+
+			int		get_cDIM(void)		{ return rDIM_; 	};	//	centroid dimension
+			void		set_cDIM(int rDIM)	{ rDIM_=rDIM;		};	//	centroid dimension
+			int		length_C(void)		{ return C_->size2;	};
+			int		length_M(void)		{ return M_->size2;	};
+			bool		isSet(void)		{ return ( bSet_ );	};	
+			ids		getIDs(void)		{ return (idlabels_);	};
+			void		setIDs(ids vid)		{ idlabels_ = vid ;	};
 		private:
 			gmat	*M_; 		// 0 THE ORIGINAL COORDINATES 
 			gmat	*C_; 		// 1 THE CENTROIDS
 			gvec	*vc_;		// 0 UNSORTED LABELS
 			gvec	*wc_;		// 1 UNSORTED LABELS
 			int	bSet_;
-			std::vector<int>	inOrder_;
-			std::vector<int>	NperC_;
+			ids	idlabels_;
+			std::vector< int >	NperC_;
 			int	rDIM_;
 	};
 	

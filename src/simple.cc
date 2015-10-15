@@ -97,6 +97,21 @@ coord_format::truncmat( gmat* M, gvec* w, int I) {
 	return px;
 }
 
+ids
+coord_format::truncIDs( ids vID , gvec* w, int I) {
+	ids idx;
+	if( vID.size()==w->size ){
+		gsl_vector *v = gsl_vector_calloc(DIM);
+		for(int i=0;i<w->size;i++)
+			if( I == ((int)(gsl_vector_get(w,i))) ) 
+				idx.push_back(vID[i]);
+	}else{
+		std::cout << "ERROR::truncIDs" << std::endl;
+	}
+	return idx;
+}
+
+
 particles
 coord_format::par2par( particles ipx, std::vector<int> ndx, int I ) {
 	particles opx;

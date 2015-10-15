@@ -59,5 +59,7 @@ typedef double ftyp;
 typedef gsl_matrix gmat;
 typedef gsl_vector gvec;
 
-typedef std::pair<std::string, gvec * > particle;
-typedef std::vector< particle > particles;
+typedef std::pair<std::string, gvec * >	particle;
+typedef std::vector< particle > 	particles;
+typedef std::pair<int,std::string> 	id;
+typedef std::vector< id > 		ids;
