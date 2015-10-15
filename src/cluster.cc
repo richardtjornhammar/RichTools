@@ -67,9 +67,11 @@ cluster::set_matrix( particles coord_space ) {
 	int reval	=	-1;
 
 	int rD = get_cDIM();
+
 	if( bSet_ == 0 ) {
-		alloc_space(D,rD);
+		alloc_space( D, rD );
 	}
+
 	if( M_->size2 == coord_space.size() && M_->size1 == DIM && bSet_ ) {
 		id inInfo;
 		idlabels_.clear();
@@ -92,7 +94,7 @@ cluster::set_matrix( particles coord_space ) {
 }
 
 int
-cluster::find_centroids ( void ){
+cluster::find_centroids(){
 	if( bSet_ ) {
 		gsl_kmeans( M_, vc_, C_, wc_ );
 		int N=wc_->size;
@@ -126,7 +128,7 @@ node_analysis::assign_node( node n ) {
 	cluster c1 = n.first;
 	cluster c2 = n.second;
 	std::vector<int> cindx;
-	
+
 	int N, M, L, K;
 	int rDIM=c1.get_cDIM();
 
@@ -204,7 +206,6 @@ node_analysis::assign_node( node n ) {
 	return bNode_;
 }
 
-
 std::vector<int> 
 node_analysis::find_centroid_relation( void ) {
 	ftyp min_rmsd	= 1.0E10;
@@ -240,7 +241,7 @@ node_analysis::find_centroid_relation( void ) {
 
 	std::vector<std::vector<int> > imv = all_permutations(iv);
 
-	for(int j=0;j<imv.size();j++){
+	for(int j=0;j<imv.size();j++) {
 		gsl_matrix_memcpy (CEN, C0N);
 		for(int i=0;i<iv.size();i++) {
 			gsl_matrix_get_col (gv, C0T, i);
@@ -255,15 +256,16 @@ node_analysis::find_centroid_relation( void ) {
 		}
 	}
 
-	if(idx_.size()!=0) {
+	if( idx_.size()!=0 ) {
 		std::cout << "INFO::ERROR WITH IDX_" << std::endl;
 		idx_.clear();
 		iidx_.clear();
 	}
+
 	for(int i=0;i<iv.size();i++)
 		iidx_.push_back(0);
 
-	for(int i=0;i<iv.size();i++){
+	for(int i=0;i<iv.size();i++) {
 		idx_.push_back(imv[J][i]);
 		iv[i]=imv[J][i];
 		iidx_[imv[J][i]]=i;
@@ -278,66 +280,6 @@ node_analysis::find_centroid_relation( void ) {
 	gsl_vector_free(gv);
 
 	return iv;
-}
-
-
-bool
-node_analysis::find_index_orders( void )
-{
-	std::vector<int> at_order, tmp_order, cl_order;
-
-	glob_idx_order_.clear();
-
-	if ( idx_.size() == children_.size() ) 
-	{
-		// std::cout<< "DOING THIS1" << std::endl;
-		cidx_.clear();
-		for ( int i=0 ; i<idx_.size() ; i++ ) 
-		{
-			for ( int j=0 ; j<children_[i].second.length_M() ; j++ ) 
-			{
-				cidx_.push_back(	iidx_[i] 	);
-				cl_order.push_back(	iidx_[i] 	);
-			}
-		}
-	}
-
-	if( cidx_.size() == parents_.second.length_M() )
-	{
-/*
-		// std::cout << "DOING THIS2" << std::endl;
-		gsl_vector *gv = gsl_vector_calloc( parents_.second.length_M() );
-		parents_.second.copyv(gv);
-
-		int N=gv->size;
-		for(int i=0;i<N;i++) 
-		{
-			tmp_order.push_back( (int)gsl_vector_get(gv,i) );
-		}
-
-		for(int i=0;i<N;i++)
-		{
-			int c = tmp_order[i];
-			for(int j=0;j<N;j++) 
-			{
-				int cj = ( cidx_[j]>=0 )?(iidx_[cidx_[j]]):(-1);
-				if( c == cj ) 
-				{
-					at_order.push_back(j);
-					glob_idx_order_.push_back(j);
-					cidx_[j]=(cidx_[j]+1)*(-1);
-					break;
-				}
-			}
-		}
-
-		//cl_order.swap(		cidx_	);
-		//at_order.swap( glob_idx_order_ 	);
-*/
-		return true;
-	}
-
-	return false;
 }
 
 void
@@ -567,7 +509,7 @@ clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw ){
 	gsl_vector_set_zero(nw);
 
 	int h, i, j;
-	ftyp old_error, error = 1E30, TOL=1E-8; 
+	ftyp old_error, error = 1E30, TOL=1E-10; 
 
 	std::vector<int> myvector;
 	for (i=0; i<NN; ++i) myvector.push_back(i); 

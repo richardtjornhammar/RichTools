@@ -105,12 +105,11 @@ namespace richanalysis {
 	typedef std::pair< cluster, cluster > node;
 	typedef std::vector< node > layer;
 
-	class node_analysis : public fitting {
+	class node_analysis : public fitting , public fileIO  {
 		public:
 			node_analysis() { bNode_ = false; bLayer_ = false; };
 			node_analysis( node n ) { bNode_ = assign_node( n ); };
 			std::vector< int >	find_centroid_relation( void );
-			bool			find_index_orders(void);
 			std::vector< int >	global_index_order ( void ) { return glob_idx_order_; };
 			std::vector< int >	cluster_index_order( void ) { return cidx_; };
 			std::pair<int,int>	size(void){ std::pair<int,int> pi; 

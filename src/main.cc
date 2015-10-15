@@ -234,41 +234,58 @@ int main (int argc, char **argv) {
 	int D		= coord_space.size();
 	int B		= carth_space.size();
 
-	richanalysis::layer old_layer;
-	richanalysis::layer solved_layer;
-	richanalysis::node n0;
-	n0.first.set_matrix(coord_space);
+//	richanalysis::layer old_layer;
+//	richanalysis::layer solved_layer;
+	richanalysis::node  n0;
+//	n0.first.set_matrix(coord_space);
 	n0.second.set_matrix(carth_space);
-	int sw = (B>=D)+1;
+
+	richanalysis::cluster clus;
+	clus.set_matrix(carth_space);
+
+	gsl_matrix *gm = gsl_matrix_calloc( DIM, B );
+	gsl_vector *gv = gsl_vector_calloc( B );
+	clus.copyM(gm);
+	clus.copyv(gv);
+	richanalysis::fileIO fio;
+	fio.output_pdb( "diagn3.pdb" , gm, gv);
+
+	return 0;
+/*
+	int sw = (B>=D) + 1;
 	old_layer.push_back(n0);
 
-	int C = 0;
-	while( solved_layer.size() != carth_space.size() )
+	int C = 1;
+//	while( solved_layer.size() != carth_space.size() )
 	{
 		richanalysis::layer current_layer;
 		current_layer.clear();
-		while( !old_layer.empty() )
+//		while( !old_layer.empty() )
 		{
 			richanalysis::node wnode	= old_layer.back();
 			old_layer.pop_back();
 			richanalysis::node_analysis	anode(wnode);
-			std::pair<int,int> S = anode.size();
+			std::pair<int, int> S = anode.size();
+
 			if ( ( S.first==1 ) || ( S.second==1 ) )
 			{
 				solved_layer.push_back(	wnode );
-			} else {
+			} else { 
 				richanalysis::layer new_layer	= anode.get_node_layer();
 				current_layer.insert( current_layer.end() , new_layer.begin() , new_layer.end() );
 			}
-			if( C++ == 1 ) {
+
+			if( C++ == 1 )
+			{
 				std::vector<int> clu_ndx	= anode.cluster_index_order();
-				std::cout << " HAVE NDX SIZE " << clu_ndx.size() << std::endl; 
+				std::cout << "INFO::HAVE NDX SIZE " << clu_ndx.size() << std::endl; 
 				std::vector<int> den_ndx	= n0.first.get_labels();
 				fIO.output_pdb("clu-nofit-n" + ns + ".pdb", carth_space , clu_ndx ); 
 				fIO.output_pdb("den-nofit-n" + ns + ".pdb", coord_space , den_ndx );
 			}
 		}
-
+	}
+////
 		while( !current_layer.empty() )
 		{
 			richanalysis::node wnode	= current_layer.back(); 
@@ -289,6 +306,6 @@ int main (int argc, char **argv) {
 
 	richanalysis::layer_analysis	alayer(solved_layer);
 	alayer.output_layer("solvedThis.pdb");
-
+*/
 	return 0;
 }
