@@ -209,13 +209,6 @@ int main (int argc, char **argv) {
 					}
                                 }
 			}
-/*		case 3: {
-				N=atoi(argv[2]);
-				bFit=(N>=0);
-				if(!bFit)
-					N*=-1;
-			}
-*/
 		case 2: {
 				std::string tmpline( argv[1] );
 				filename[0] = tmpline;
@@ -301,94 +294,9 @@ int main (int argc, char **argv) {
 			std::cout << " <<s>> " << solved_layer[i].second.length_M();
 		  std::cout << std::endl;
 	}
-/*
-	cl1.alloc_space(D,N); 
-	cl2.alloc_space(B,N);
 
-	cl1.set_matrix( coord_space ); 	
-	cl2.set_matrix( carth_space );
+	richanalysis::layer_analysis	alayer(solved_layer);
+	alayer.output_layer("solvedThis.pdb");
 
-	cl1.perform_clustering(); 
-	cl2.perform_clustering();
-	std::vector<int> den_ndx = cl1.get_labels();
-	std::vector<int> crd_ndx = cl2.get_labels();
-	
-	richanalysis::coord_format cftool;
-	std::vector<std::string > anames;
-	for(int i=0;i<N;i++)
-		anames.push_back("C");
-
-	std::vector<int> idx1,idx2;
-
-	fIO.output_pdb("mod-nofit-n"+ns+".pdb", carth_space , crd_ndx);
-
-
-	if(!bFit){
-// NCULSTS 1/12 with H 1/8 without
-		gsl_matrix *C = gsl_matrix_alloc(DIM,N);
-		gsl_vector *w = gsl_vector_alloc(N);
-		cl1.copyC(C); // the centroids are unordered
-		cl1.copyw(w);
-		
-		particles centroids = cftool.mat2par(C,w);
-		gmat *dM = gsl_matrix_calloc(N,N);
-		std::cout << "INFO" << centroids.size()<<std::endl;
-		calc_distance_matrix(dM, centroids);
-		idx1=outp_distance_matrix(dM, 1.4); // 1.39 sqrt(3)*1.39 2*1.39
-		cl1.connectivity(dM,1.4);
-
-		if(N==B){
-			gsl_matrix *M = gsl_matrix_alloc(DIM,B);
-			gsl_vector *v = gsl_vector_alloc(B);
-			cl2.copyM(M);
-			cl2.copyv(v);
-			particles centrs = cftool.mat2par(M,v);
-			gmat *dN = gsl_matrix_calloc(B,B);
-	
-			calc_distance_matrix(dN, centrs);
-			idx2=outp_distance_matrix(dN, 1.4);
-			cl2.connectivity(dN, 1.4);
-		}
-		std::cout << "IDX1 " << std::endl;
-		int sum=0;
-		for(int i=0;i<idx1.size();i++){
-			std::cout << " " << idx1[i] ;
-			sum+=idx1[i];
-		}
-		std::cout << "SUM " << sum << std::endl;
-		sum=0;
-		std::cout << "IDX2 " << std::endl;
-		for(int i=0;i<idx2.size();i++){
-			std::cout << " " << idx2[i] ;
-			sum+=idx2[i];
-		}
-		std::cout << "SUM " << sum << std::endl;
-		std::cout << std::endl;
-		fIO.output_pdb("cen-nofit-n"+ns+".pdb", C , anames);
-
-		return (0);
-	}
-
-	int isw = 0;
-
-	richanalysis::cluster_node nidx;
-
-	nidx.assign_sub(cl1,cl2);
-	std::vector<int> fio_ndx, rel_ndx = nidx.find_centroid_relation();
-	particles align_space = nidx.apply_rot_trans( carth_space );
-
-	for( int i=0 ; i<crd_ndx.size() ; i++ ) {
-		fio_ndx.push_back( rel_ndx[crd_ndx[i]] );
-	}
-	fIO.output_pdb("color-rel-n"+ns+".pdb", align_space  , fio_ndx );
-
-	std::pair<particles, std::vector<int> > pf_id;
-	pf_id = nidx.apply_fragment_trans( carth_space , fio_ndx );
-	std::cout << "INFO:: " << pf_id.first.size() << " AND " << align_space.size() << std::endl;
-
-	std::vector<int> at_order = nidx.global_fragment_order();
-	fIO.output_pdb("frag-rel-n"+ns+".pdb" , pf_id.first  , pf_id.second , at_order);
-*/
-	
 	return 0;
 }

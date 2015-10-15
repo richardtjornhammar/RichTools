@@ -329,6 +329,36 @@ node_analysis::find_index_orders( void )
 }
 
 void
+layer_analysis::output_layer ( std::string filename ) {
+	if( bSet_ ) {
+		int N = own_.size();
+		bool bFirst=true;
+		particles ps;
+		for(int i=0;i<N;i++){
+			bFirst 		= own_[i].first.length_M()>=own_[i].second.length_M();
+			cluster c_d 	= bFirst?own_[i].first:own_[i].second;
+			int	N_d 	= bFirst?own_[i].first.length_M():own_[i].second.length_M();
+			gsl_matrix *m = gsl_matrix_alloc(DIM,N_d);
+			gsl_vector *v = gsl_vector_calloc(DIM);
+			gsl_vector *w = gsl_vector_calloc(DIM);
+			c_d.copyM(m);
+			for(int j=0;j<N_d;j++){
+				gsl_matrix_get_col ( v,m,j );
+				gsl_vector_add(w,v);
+			}
+			gsl_vector_scale(w,1.0/((float)(N_d)));
+			particle p;
+			p.first  = "C";
+			p.second = gsl_vector_alloc(DIM);
+			gsl_vector_memcpy(p.second,w);
+			ps.push_back(p);
+			gsl_matrix_free(m); gsl_vector_free(v); gsl_vector_free(w);
+		}
+		output_pdb( filename , ps );
+	}
+}
+
+void
 cluster0::alloc_space( int D1, int D2 ) {
 //D1	COORDINATE	SPACE
 //D2	CENTROID	SPACE
