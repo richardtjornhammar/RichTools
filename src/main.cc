@@ -234,33 +234,47 @@ int main (int argc, char **argv) {
 	int D		= coord_space.size();
 	int B		= carth_space.size();
 
-//	richanalysis::layer old_layer;
-//	richanalysis::layer solved_layer;
-	richanalysis::node  n0;
-//	n0.first.set_matrix(coord_space);
-	n0.second.set_matrix(carth_space);
+////DEBUG SECTION:: SINGLE PASS
+/*
+	richanalysis::node	n0;
+	richanalysis::cluster	clu, clu2, clu1;
 
-	richanalysis::cluster clus;
-	clus.set_matrix(carth_space);
+	n0.first .set_matrix(coord_space);
+	n0.second.set_matrix(carth_space);
 
 	gsl_matrix *gm = gsl_matrix_calloc( DIM, B );
 	gsl_vector *gv = gsl_vector_calloc( B );
-	clus.copyM(gm);
-	clus.copyv(gv);
+	n0.second.copyM(gm);
+	n0.second.copyv(gv);	
+	richanalysis::node_analysis	anode(n0);
+	std::vector<int> clu_ndx	= anode.cluster_index_order();
+	fIO.output_pdb("clu-nofit-n" + ns + ".pdb", carth_space , clu_ndx ); 
 	richanalysis::fileIO fio;
 	fio.output_pdb( "diagn3.pdb" , gm, gv);
-
 	return 0;
-/*
+*/
+////END DEBUG
+
+	richanalysis::layer	old_layer;
+	richanalysis::layer	solved_layer;
+	richanalysis::node	n0;
+	if(D>=B){
+		n0.first.set_matrix(coord_space);
+		n0.second.set_matrix(carth_space);
+	}else{
+		n0.second.set_matrix(coord_space);
+		n0.first.set_matrix(carth_space);
+	}
+
 	int sw = (B>=D) + 1;
 	old_layer.push_back(n0);
 
 	int C = 1;
-//	while( solved_layer.size() != carth_space.size() )
+	while( solved_layer.size() != carth_space.size() )
 	{
 		richanalysis::layer current_layer;
 		current_layer.clear();
-//		while( !old_layer.empty() )
+		while( !old_layer.empty() )
 		{
 			richanalysis::node wnode	= old_layer.back();
 			old_layer.pop_back();
@@ -284,8 +298,7 @@ int main (int argc, char **argv) {
 				fIO.output_pdb("den-nofit-n" + ns + ".pdb", coord_space , den_ndx );
 			}
 		}
-	}
-////
+
 		while( !current_layer.empty() )
 		{
 			richanalysis::node wnode	= current_layer.back(); 
@@ -306,6 +319,6 @@ int main (int argc, char **argv) {
 
 	richanalysis::layer_analysis	alayer(solved_layer);
 	alayer.output_layer("solvedThis.pdb");
-*/
+
 	return 0;
 }

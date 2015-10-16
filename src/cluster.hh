@@ -46,7 +46,7 @@
 
 namespace richanalysis {
 
-	class clustering : public simple_ops {
+	class clustering : public simple_ops , public tensorIO  {
 		public:
 		//! null constructor
 			inline clustering() {} //!< Null constructor
@@ -59,7 +59,7 @@ namespace richanalysis {
 			int connectivity( gmat * , ftyp val );
 	};
 
-	class cluster :  public clustering, public tensorIO {
+	class cluster :  public clustering {
 		public:
 			cluster() { 	bSet_ = false; rDIM_=DIM; };
 			void		alloc_space ( int, int );	//	model_N and cent_N
@@ -142,7 +142,7 @@ namespace richanalysis {
 			bool	bSet_;
 	};
 
-	class cluster0 : public clustering, public linalg, public tensorIO {
+	class cluster0 : public clustering, public linalg {
 		public:
 			cluster0() { 	bSet_[0]=0; bSet_[1]=0; bSet_[2]=0; bSet_[3]=0; bPCset_=0;
 					Uc_  = gsl_matrix_calloc( DIM, DIM );	tc_ = gsl_vector_calloc( DIM ); 
@@ -162,7 +162,6 @@ namespace richanalysis {
 							output_vector(wc_ );
 						} ;
 			int			perform_clustering( void );
-			int			perform_clustering( ftyp );
 			int			length_C(void){ return C_->size2; };
 			int			length_M(void){ return M_->size2; };
 			void	copyC(gmat *C0){ if(C0->size1==C_->size1&&C0->size2==C_->size2) { gsl_matrix_memcpy(C0, C_); } };

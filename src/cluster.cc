@@ -50,6 +50,7 @@ void
 cluster::alloc_space( int D1, int D2 ) {
 //D1	COORDINATE	SPACE
 //D2	CENTROID	SPACE
+	// std::cout <<"ALLOC:: " << D1 << " " << D2 << std::endl;
 	if( D1 > 0 && D2 > 0 ) {
 		M_	= gsl_matrix_calloc( DIM, D1 );	// MODEL
 		C_	= gsl_matrix_calloc( DIM, D2 );	// DATA
@@ -66,13 +67,15 @@ cluster::set_matrix( particles coord_space ) {
 	int D		= coord_space.size();
 	int reval	=	-1;
 
-	int rD = get_cDIM();
+	int rD = get_cDIM(); 
 
 	if( bSet_ == 0 ) {
+		// std::cout << "INFO::ALLOCATING "<<D<<" "<<rD<<std::endl;
 		alloc_space( D, rD );
 	}
 
 	if( M_->size2 == coord_space.size() && M_->size1 == DIM && bSet_ ) {
+		// std::cout << "INFO::ASSIGNING::COORDS "<< D <<" "<<rD<<std::endl;
 		id inInfo;
 		idlabels_.clear();
 		for(int i=0;i<D; i++) {
@@ -81,7 +84,6 @@ cluster::set_matrix( particles coord_space ) {
 			idlabels_.push_back ( inInfo );
 			gsl_matrix_set_col  ( M_ , i, coord_space[i].second );
 		}
-		gsl_vector_set_all ( vc_ , 1.0 );
 		reval =0; 
 	} else {
 		std::cout << "ERROR:: BAD CONTAINER LENGTHS:: set_matrix" 
@@ -96,9 +98,9 @@ cluster::set_matrix( particles coord_space ) {
 int
 cluster::find_centroids(){
 	if( bSet_ ) {
-		gsl_kmeans( M_, vc_, C_, wc_ );
 		int N=wc_->size;
 		int M=vc_->size;
+		gsl_kmeans( M_ , vc_ , C_ , wc_ );
 		NperC_.clear();
 		for(int i=0;i<N;i++){
 			int numi=0;
@@ -271,7 +273,6 @@ node_analysis::find_centroid_relation( void ) {
 		iidx_[imv[J][i]]=i;
 	}
 	
-
 	gsl_matrix_free(CNT);
 	gsl_matrix_free(C0N);
 	gsl_matrix_free(C0T);
@@ -346,23 +347,6 @@ int
 cluster0::perform_clustering ( void ){
 	if( bSet_[0] && bSet_[1] && bSet_[2] && bSet_[3] ) {
 		gsl_kmeans(M_, vc_, C_, wc_);
-		int N=wc_->size;
-		int M=vc_->size;
-		NperC_.clear();
-		for(int i=0;i<N;i++){
-			int numi=0;
-			for( int j=0 ; j<vc_->size ; j++ ) {
-				numi+=(gsl_vector_get(vc_,j)==i)?1:0;
-			}
-			NperC_.push_back(numi);
-		}
-	}
-}
-
-int
-cluster0::perform_clustering ( ftyp cutoff ){
-	if( bSet_[0] && bSet_[1] && bSet_[2] && bSet_[3] ) {
-		gsl_kmeans(M_, vc_, C_, wc_, cutoff);
 		int N=wc_->size;
 		int M=vc_->size;
 		NperC_.clear();
@@ -500,27 +484,35 @@ int
 clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw ){
 	int NN=dat->size2, MM=dat->size1, KK=cent->size2;
 
-	gvec *labels = gsl_vector_alloc(NN);
-	gvec *counts = gsl_vector_alloc(KK);
-	gmat *tmp_ce = gsl_matrix_alloc(MM,KK);
+	gvec *labels = gsl_vector_calloc(NN);
+	gvec *counts = gsl_vector_calloc(KK);
+	gmat *tmp_ce = gsl_matrix_calloc(MM,KK);
 
-	if( ((int)cent->size1)!=MM || !gsl_vector_isnonneg(w) || ((int)w->size)!=NN || ((int)nw->size)!=KK )	
+	if( ((int)cent->size1)!=MM || !gsl_vector_isnonneg(w) || ((int)w->size)!=NN || ((int)nw->size)!=KK )	{
+		std::cout << "ERROR::BAD::KMEANS" << std::endl;
 		return -1;
+	}
 	gsl_vector_set_zero(nw);
+	gsl_vector_set_zero(w);
 
 	int h, i, j;
-	ftyp old_error, error = 1E30, TOL=1E-10; 
+	ftyp old_error, error = 1E30, TOL=1E-8; 
 
 	std::vector<int> myvector;
 	for (i=0; i<NN; ++i) myvector.push_back(i); 
-	random_shuffle ( myvector.begin(), myvector.end() );
+
+	for (i=0;i<KK;i++)
+		random_shuffle ( myvector.begin(), myvector.end() );
+
+//implement a distance check here
 
 	i=0;
 	for ( h=0 ; h<KK ; h++ ){
-		for ( j=XX ; j<=ZZ ; j++ ){ 
+		for ( j=XX ; j<=ZZ ; j++ ) { 
 			gsl_matrix_set( cent, j, h , gsl_matrix_get( dat, j, myvector[h] ) );
 		} 
 	}
+
 	do {
 		old_error = error, error = 0; 
 		for (i = 0; i < KK; i++ ) {
@@ -560,83 +552,7 @@ clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw ){
 		h 	= gsl_vector_get(labels,i);
 		wi	= gsl_vector_get(w,i);
 		nwh	= gsl_vector_get(nw,h);
-		gsl_vector_set(w,i,h);			// MIGHT NOT WANT TO OVERWRITE THIS
-		gsl_vector_set(nw,h,nwh+wi); 		// NOT NORMALIZED HERE
-	}
-
-	gsl_vector_free(labels); 
-	gsl_vector_free(counts);
-	gsl_matrix_free(tmp_ce);
-
-	return 0;
-}
-
-
-int 
-clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw, ftyp cutoff){
-	int NN=dat->size2, MM=dat->size1, KK=cent->size2;
-
-	gvec *labels = gsl_vector_alloc(NN);
-	gvec *counts = gsl_vector_alloc(KK);
-	gmat *tmp_ce = gsl_matrix_alloc(MM,KK);
-
-	if( ((int)cent->size1)!=MM || !gsl_vector_isnonneg(w) || ((int)w->size)!=NN || ((int)nw->size)!=KK )	
-		return -1;
-	gsl_vector_set_zero(nw);
-
-	int h, i, j;
-	ftyp old_error, error = 1E30, TOL=1E-4; 
-
-	std::vector<int> myvector;
-	for (i=0; i<NN; ++i) myvector.push_back(i); 
-	random_shuffle ( myvector.begin(), myvector.end() );
-
-	i=0;
-	for ( h=0 ; h<KK ; h++ ){
-		for ( j=XX ; j<=ZZ ; j++ ){ 
-			gsl_matrix_set( cent, j, h , gsl_matrix_get( dat, j, myvector[h] ) );
-		} 
-	}
-	do {
-		old_error = error, error = 0; 
-		for (i = 0; i < KK; i++ ) {
-			gsl_vector_set(counts,i,0);
-			for (j = XX; j <= ZZ; j++){
-				gsl_matrix_set(tmp_ce,j,i,0.0);
-			}
- 		}
-		for (h = 0; h < NN; h++) {
-			ftyp min_distance = 1E30;
-			for (i = 0; i < KK; i++) {
-				ftyp distance = 0;
-				for ( j = XX; j<=ZZ ; j++ ) {
-					distance += square( gsl_matrix_get( dat,j,h ) - gsl_matrix_get( cent,j,i ) );
-				}
-				if ( distance < min_distance   ) { // && distance > square(cutoff)
-	 				gsl_vector_set(labels,h,i); min_distance = distance; 
-				} 
-			} 
-			for ( j=XX ; j<=ZZ ; j++ ){
- 				gsl_matrix_set( tmp_ce, j, gsl_vector_get(labels,h),
-				 gsl_matrix_get( dat, j, h ) + gsl_matrix_get(tmp_ce, j, gsl_vector_get(labels,h)) );
-			}
-			gsl_vector_set(counts,gsl_vector_get(labels,h),1.0+gsl_vector_get(counts,gsl_vector_get(labels,h)));
-	 		error += min_distance; 
-		}
-	 	for (i = 0; i < KK; i++) {
-	 		for ( j=XX ; j<=ZZ ; j++ ) {
-				gsl_matrix_set(cent,j,i,
-				gsl_vector_get(counts,i)?(gsl_matrix_get(tmp_ce,j,i)/gsl_vector_get(counts,i)):(gsl_matrix_get(tmp_ce,j,i)));
-	 		}
-	 	}
-	} while ( fabs(error - old_error) > TOL );	// WHILE THEY ARE MOVING
-
-	ftyp wi=0.0, nwh=0.0;
-	for( i=0 ; i<NN ; i++) {
-		h 	= gsl_vector_get(labels,i);
-		wi	= gsl_vector_get(w,i);
-		nwh	= gsl_vector_get(nw,h);
-		gsl_vector_set(w,i,h);			// MIGHT NOT WANT TO OVERWRITE THIS
+		gsl_vector_set(w,i,h);		// MIGHT NOT WANT TO OVERWRITE THIS
 		gsl_vector_set(nw,h,nwh+wi); 		// NOT NORMALIZED HERE
 	}
 
@@ -991,6 +907,7 @@ cluster0::normal( void ){
 		return par;
 	}
 }
+
 particle
 cluster0::center( void ){
 	if( has_shape() ){
