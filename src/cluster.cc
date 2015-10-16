@@ -47,10 +47,218 @@
 using namespace richanalysis;
 
 void
+particle_analysis::output_result( std::string filename ) {
+	if( complete() ) {
+		int N = model_.size();
+		particles ps;
+		for(int i=0 ; i<N ; i++ ) {
+			gvec	*w = gsl_vector_alloc(DIM);
+			gsl_matrix_get_col(w,C_,i);
+			particle p;
+			std::string label	=	"C" ;
+			p.first			=	label;
+			p.second		= 	gsl_vector_alloc(DIM);
+			gsl_vector_memcpy(p.second,w);
+			ps.push_back(p);
+			gsl_vector_free(w);
+		}
+		output_pdb( filename , ps );
+	}
+}
+
+void
+particle_analysis::assign_matrices(void){
+	if(complete()){
+		A_	= gsl_matrix_calloc(model_.size(),model_.size());
+		B_ 	= gsl_matrix_calloc(model_.size(),model_.size());
+		C_	= gsl_matrix_calloc(DIM,model_.size());
+		M_ 	= gsl_matrix_calloc(DIM,density_.size());
+		vc_	= gsl_vector_calloc(density_.size());
+		wc_	= gsl_vector_calloc(model_.size());
+		gvec *r = gsl_vector_alloc( DIM );
+		for(int i=0;i<density_.size();i++) { 
+			gsl_vector_memcpy( r , density_[i].second ); 
+			gsl_matrix_set_col(M_, i, r);
+		}	
+		gsl_kmeans( M_ , vc_, C_, wc_ );
+		calc_distance_matrices();
+		output_matrix(C_);
+		bMatrices_	= true;
+	} else {
+		std::cout <<"INFO::HAVENOTHING!" <<std::endl;
+	}
+}
+
+int 
+particle_analysis::calc_distance_matrices(void) {
+
+	if( complete() ) {
+		if(A_) // CLUSTERED DENSITY
+			gsl_matrix_free(A_);
+		A_  = gsl_matrix_alloc( C_->size2, C_->size2 );
+
+		gvec *r1 = gsl_vector_alloc( DIM );
+		gvec *r2 = gsl_vector_alloc( DIM );
+		
+		int D = A_->size2;
+
+		for(int i=0;i<D; i++){
+			for(int j=0;j<D;j++){
+				gsl_matrix_get_col(r1,C_,i);
+				gsl_matrix_get_col(r2,C_,j);
+				gsl_vector_sub(r1,r2);
+				ftyp len = gsl_blas_dnrm2(r1);
+				gsl_matrix_set( A_, i, j, len );
+			}
+		}
+
+		if(B_) // MODEL
+			gsl_matrix_free(B_);
+		B_  = gsl_matrix_alloc( C_->size2, C_->size2 );
+
+		for(int i=0;i<D; i++){
+			for(int j=0;j<D;j++){
+				gsl_vector_memcpy(r1,model_[i].second);
+				gsl_vector_memcpy(r2,model_[j].second);
+				gsl_vector_sub(r1,r2);
+				ftyp len = gsl_blas_dnrm2(r1);
+				gsl_matrix_set( B_, i, j, len );
+			}
+		}
+		return 0;
+	}else{
+		std::cout << "ERROR::PARTICLE SETS NOT ASSIGNED" << std::endl;
+		return 1;
+	}
+}
+
+std::vector<int>
+particle_analysis::outp_distance_matrix( gmat *A, ftyp level ) {
+	int D = A->size1;
+	std::vector<int> vi;
+	if( A->size1 == A->size2 ) {
+		std::cout << " A(" << D << "," << D << ")=[" << std::endl; 
+		for(int i=0; i<D; i++){
+			ftyp sum=0,sumb=0;
+			for(int j=0;j<D;j++){
+				ftyp val=gsl_matrix_get(A,i,j);
+				ftyp valb=0;
+				if(level!=0) {
+					if(level>0) {
+						valb=val<level;
+					}else{
+						valb=val>sqrt(level*level);
+					}
+				}
+				if(valb>0)
+					std::cout << "\033[1;31m " << valb <<"\033[0m";
+				else
+					std::cout << " " << valb ;
+				val*=valb;
+				if(i!=j){
+					sum  += val;
+					sumb +=valb;
+				}
+			}
+			vi.push_back(sumb);
+			std::cout << " | " << sumb << " | " << sum << std::endl;
+		}
+		std::cout << "];" << std::endl;
+	}
+	return vi;
+}
+
+bool particle_sort_func(std::pair<ftyp, std::pair< int, int > > i1,std::pair<ftyp, std::pair< int, int > > i2) {
+	return (i1.first<i2.first);
+};
+
+std::vector< std::pair<ftyp, std::pair< int, int > > >
+particle_analysis::compare_dist_matrices(gmat *A, gmat *B, ftyp val) {
+
+	std::vector< std::pair<ftyp, std::pair< int, int > > > vi;
+
+	if(A->size1==B->size1&&A->size2==B->size2&&A->size1==B->size2)
+	{
+		gvec *va = gsl_vector_calloc(A->size1);
+		gvec *vb = gsl_vector_calloc(B->size2);
+		for(int i=0;i<A->size1;i++) 
+		{
+			ftyp diff=1E10,dotn2;
+			int I=0;
+			for(int j=0;j<B->size1;j++) 
+			{
+				gsl_matrix_get_row ( va, A, i );
+				gsl_matrix_get_row ( vb, B, j );
+				gsl_vector_sub( va, vb );
+				diff=gsl_blas_dnrm2(va);
+				std::pair<ftyp, std::pair<int, int> > rel;
+				rel.first = diff; rel.second.first=i; rel.second.second=j;
+				vi.push_back(rel);
+			}
+		}
+	}
+	std::sort (vi.begin(), vi.end(),particle_sort_func);
+	return vi;
+}
+
+/*
+			void			outp_distance_matrix(gmat *A);
+void outp_distance_matrix(gmat *A) {
+	int D = A->size1;
+	if( A->size1 == A->size2 ) {
+		std::cout << " A(" << D << "," << D << ")=[" << std::endl; 
+		for(int i=0; i<D; i++){
+			ftyp sum=0;
+			for(int j=0;j<D;j++){
+				ftyp val=gsl_matrix_get(A,i,j);
+
+				if(val>0)
+					std::cout << "\033[1;31m " << val <<"\033[0m";
+				else
+					std::cout << " " << val ;
+				if(i!=j)
+					sum += val;
+			}
+			std::cout << " | " << sum << std::endl;
+		}
+		std::cout << "];" << std::endl;
+	}
+}
+*/
+
+std::vector<int > 
+particle_analysis::find_via_distance( gmat *A, ftyp level ) {
+	int D = A->size1;
+	std::vector<int > is_tmp;
+	int sumZero = (level<0)?(1):(0);
+	if (sumZero)
+		level = sqrt(level*level);
+	std::cout <<"INFO::LEVEL="<< level << std::endl;
+	if( A->size1 == A->size2 ) {
+		for(int i=0; i<D; i++){
+			ftyp sum=0;
+			for(int j=0;j<D;j++){
+				ftyp val= gsl_matrix_get(A,i,j);
+				if(level>0)
+					val=val<level;
+				if(i!=j)
+					sum += val;
+			}
+			if(!sumZero)
+				is_tmp.push_back(sum>1);
+			else
+				is_tmp.push_back(sum==0);
+		}
+	}
+	return is_tmp;
+}
+
+
+void
 cluster::alloc_space( int D1, int D2 ) {
 //D1	COORDINATE	SPACE
 //D2	CENTROID	SPACE
-	// std::cout <<"ALLOC:: " << D1 << " " << D2 << std::endl;
+	// std::cout << "ALLOC:: " << D1 << " " << D2 << std::endl;
 	if( D1 > 0 && D2 > 0 ) {
 		M_	= gsl_matrix_calloc( DIM, D1 );	// MODEL
 		C_	= gsl_matrix_calloc( DIM, D2 );	// DATA
@@ -70,7 +278,7 @@ cluster::set_matrix( particles coord_space ) {
 	int rD = get_cDIM(); 
 
 	if( bSet_ == 0 ) {
-		// std::cout << "INFO::ALLOCATING "<<D<<" "<<rD<<std::endl;
+//		std::cout << "INFO::ALLOCATING "<<D<<" "<<rD<<std::endl;
 		alloc_space( D, rD );
 	}
 

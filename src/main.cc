@@ -43,145 +43,6 @@
 #include "iofunc.hh"
 #include "cluster.hh"
 
-int calc_distance_matrix(gmat *A, particles coord_space) {
-	int D = A->size1;
-	if( A->size1 == A->size2 && A->size1 == coord_space.size()) {
-		for(int i=0;i<D; i++){
-			for(int j=0;j<D;j++){
-				ftyp dx,dy,dz;
-				dx = gsl_vector_get(coord_space[i].second,XX)-gsl_vector_get(coord_space[j].second,XX);
-				dy = gsl_vector_get(coord_space[i].second,YY)-gsl_vector_get(coord_space[j].second,YY);
-				dz = gsl_vector_get(coord_space[i].second,ZZ)-gsl_vector_get(coord_space[j].second,ZZ);
-				ftyp len = sqrt(dx*dx+dy*dy+dz*dz);
-				gsl_matrix_set( A, i, j, len );
-			}
-		}
-		return 0;
-	}else{
-		std::cout << "ERROR:: BAD CONTAINER LENGTHS:: calc_distance_matrix" << std::endl;
-		return 1;
-	}
-}
-
-std::vector<int>
-outp_distance_matrix(gmat *A, ftyp level) {
-	int D = A->size1;
-	std::vector<int> vi;
-	if( A->size1 == A->size2 ) {
-		std::cout << " A(" << D << "," << D << ")=[" << std::endl; 
-		for(int i=0; i<D; i++){
-			ftyp sum=0,sumb=0;
-			for(int j=0;j<D;j++){
-				ftyp val=gsl_matrix_get(A,i,j);
-				ftyp valb=0;
-				if(level!=0) {
-					if(level>0) {
-						valb=val<level;
-					}else{
-						valb=val>sqrt(level*level);
-					}
-				}
-				if(valb>0)
-					std::cout << "\033[1;31m " << valb <<"\033[0m";
-				else
-					std::cout << " " << valb ;
-				val*=valb;
-				if(i!=j){
-					sum  += val;
-					sumb +=valb;
-				}
-			}
-			vi.push_back(sumb);
-			std::cout << " | " << sumb << " | " << sum << std::endl;
-		}
-		std::cout << "];" << std::endl;
-	}
-	return vi;
-}
-
-std::vector<int>
-compare_dist_matrices(gmat *A, gmat *B, ftyp val){
-
-	std::vector<int> vi;
-	if(A->size1==B->size1&&A->size2==B->size2&&A->size1==B->size2)
-	{
-		std::cout << "COMPARING..." << std::endl;
-		gvec *va = gsl_vector_calloc(A->size1);
-		gvec *vb = gsl_vector_calloc(B->size2);
-
-		for(int i=0;i<A->size1;i++) 
-		{
-			ftyp diff=1E10,dotp;
-			int I=0;
-			for(int j=0;j<B->size1;j++) 
-			{
-				gsl_matrix_get_row ( va, A, i );
-				gsl_matrix_get_row ( vb, B, j );
-				gsl_vector_sub(va,vb);
-				gsl_blas_ddot (va, va, &dotp);
-				if(dotp<diff)
-				{
-					I = j;
-					diff=dotp;
-				}
-			}
-			vi.push_back(I);
-		}
-	}
-
-	return vi;
-}
-
-int outp_distance_matrix(gmat *A) {
-	int D = A->size1;
-	if( A->size1 == A->size2 ) {
-		std::cout << " A(" << D << "," << D << ")=[" << std::endl; 
-		for(int i=0; i<D; i++){
-			ftyp sum=0;
-			for(int j=0;j<D;j++){
-				ftyp val=gsl_matrix_get(A,i,j);
-
-				if(val>0)
-					std::cout << "\033[1;31m " << val <<"\033[0m";
-				else
-					std::cout << " " << val ;
-				if(i!=j)
-					sum += val;
-			}
-			std::cout << " | " << sum << std::endl;
-		}
-		std::cout << "];" << std::endl;
-	}
-	return 0;
-}
-
-
-std::vector<int > find_via_distance( gmat *A, ftyp level ) {
-	int D = A->size1;
-	std::vector<int > is_tmp;
-	int sumZero = (level<0)?(1):(0);
-	if (sumZero)
-		level = sqrt(level*level);
-	std::cout <<"INFO::LEVEL="<< level << std::endl;
-	if( A->size1 == A->size2 ) {
-		for(int i=0; i<D; i++){
-			ftyp sum=0;
-			for(int j=0;j<D;j++){
-				ftyp val= gsl_matrix_get(A,i,j);
-				if(level>0)
-					val=val<level;
-				if(i!=j)
-					sum += val;
-			}
-			if(!sumZero)
-				is_tmp.push_back(sum>1);
-			else
-				is_tmp.push_back(sum==0);
-		}
-	}
-	return is_tmp;
-}
-
 int main (int argc, char **argv) {
 
 	std::string 	filename[2];
@@ -320,5 +181,17 @@ int main (int argc, char **argv) {
 	richanalysis::layer_analysis	alayer(solved_layer);
 	alayer.output_layer("solvedThis.pdb");
 
+////ALTERNATIVE
+	std::cout <<"ALTERNATIVE"<<std::endl;
+	richanalysis::particle_analysis pa;
+	pa.assign_particles(coord_space,carth_space);
+	std::vector< std::pair<ftyp, std::pair< int, int > > > atomlist = pa.compare_dist_matrices(1.5);
+	std::cout << "INFO::"  << atomlist.size() << std::endl;
+	for(int i=0 ; i<atomlist.size() ; i++ )
+		std::cout << "INFO::" << atomlist[i].first << " " 
+			<< atomlist[i].second.first << " TO " 
+			<< atomlist[i].second.second << std::endl;
+
+	pa.output_result("pastuff.pdb");
 	return 0;
 }

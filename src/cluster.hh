@@ -53,7 +53,7 @@ namespace richanalysis {
 
 		//! performs k-means clustering on the specified data
 			int gsl_kmeans( gmat *, gvec *, gmat *, gvec * );
-			int gsl_kmeans( gmat *, gvec *, gmat *, gvec *, ftyp );
+			//int gsl_kmeans( gmat *, gvec *, gmat *, gvec *, ftyp );
 
 		//! performs my own connectivity clustering algorithm
 			int connectivity( gmat * , ftyp val );
@@ -62,7 +62,7 @@ namespace richanalysis {
 	class cluster :  public clustering {
 		public:
 			cluster() { 	bSet_ = false; rDIM_=DIM; };
-			void		alloc_space ( int, int );	//	model_N and cent_N
+			void		alloc_space ( int, int );
 			int		set_matrix( particles ); 
 			int		find_centroids( void );
 			std::vector<int>	get_labels( void );
@@ -140,6 +140,45 @@ namespace richanalysis {
 		private:
 			layer	own_;
 			bool	bSet_;
+	};
+
+	class particle_analysis : public clustering , public fileIO {
+		public:
+			particle_analysis(){ bAssigned_ = false; bMatrices_ = false; };
+			int 			calc_distance_matrices(void);
+			std::vector< int >	find_via_distance	( gmat *A, ftyp level );
+			std::vector<int> 	outp_distance_matrix	( gmat *A, ftyp level );
+			std::vector<int> 	outp_distance_matrix	( ftyp level ) { 
+						return outp_distance_matrix( A_, level );};
+			std::vector< std::pair<ftyp, std::pair< int, int > > >	compare_dist_matrices(gmat *A, gmat *B, ftyp val);
+			std::vector< std::pair<ftyp, std::pair< int, int > > >	compare_dist_matrices(ftyp val) { 
+						 return compare_dist_matrices(A_,B_,val); };
+			void			assign_particles( particles pd, particles pm )	{
+				if( pd.size() > pm.size() ) {
+					density_.clear(); density_.insert( density_.end() , pd.begin() , pd.end() );
+					model_.clear(); model_.insert( model_.end() , pm.begin() , pm.end() );
+				} else {
+					density_.clear(); density_.insert( density_.end() , pm.begin() , pm.end() );
+					model_.clear(); model_.insert( model_.end() , pd.begin() , pd.end() );					
+				} 
+				bAssigned_ = true; 
+				assign_matrices();};
+			void			assign_matrices( void );
+			int	check(){ return M_->size2; };
+			void	output_result( std::string );
+			bool			complete( void ) { return bAssigned_; };
+			bool			matrices( void ) { return bMatrices_; };
+			particles		output_reduced_density(void);
+		private:
+			bool bAssigned_, bMatrices_;
+			particles density_;
+			particles model_;
+			ftyp	rcut_;
+			gmat	*A_, *B_;
+			gmat	*C_, *M_;			
+			gvec	*vc_;		// 0 UNSORTED LABELS
+			gvec	*wc_;		// 1 UNSORTED LABELS
+			std::vector< std::pair<ftyp, std::pair< int, int > > > relation_;
 	};
 
 	class cluster0 : public clustering, public linalg {
