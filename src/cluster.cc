@@ -68,7 +68,7 @@ particle_analysis::output_result( std::string filename ) {
 
 void
 particle_analysis::assign_matrices(void){
-	if(complete()){
+	if( complete() ){
 		A_	= gsl_matrix_calloc(model_.size(),model_.size());
 		B_ 	= gsl_matrix_calloc(model_.size(),model_.size());
 		C_	= gsl_matrix_calloc(DIM,model_.size());
@@ -82,10 +82,10 @@ particle_analysis::assign_matrices(void){
 		}	
 		gsl_kmeans( M_ , vc_, C_, wc_ );
 		calc_distance_matrices();
-		output_matrix(C_);
+		//output_matrix(C_);
 		bMatrices_	= true;
 	} else {
-		std::cout <<"INFO::HAVENOTHING!" <<std::endl;
+		std::cout <<"INFO::IHAVENOTHING!" <<std::endl;
 	}
 }
 
@@ -327,6 +327,15 @@ cluster::get_labels( void ){
 	if( bSet_ )
 		for(int i=0;i<vc_->size;i++)
 			ndx.push_back(gsl_vector_get(vc_,i));
+	return ndx;
+}
+
+std::vector<int>	
+cluster::get_clabels( void ){
+	std::vector<int> ndx;
+	if( bSet_ )
+		for(int i=0;i<wc_->size;i++)
+			ndx.push_back(gsl_vector_get(wc_,i));
 	return ndx;
 }
 

@@ -60,11 +60,11 @@ int main (int argc, char **argv) {
 			        std::string tmpline( argv[2] );
 				filename[1] = tmpline;
                                 std::size_t found = tmpline.find(ext);
-                                if (found!=std::string::npos){
+                                if ( found != std::string::npos ){
                                         std::cout << "INFO:: FOUND XYZ INPUT NAME = " << filename[1] << std::endl;
                                         carth_space = fIO.read_xyz(filename[1]);
                                         std::cout << "INFO:: DONE READING MODEL" << std::endl;
-					if(carth_space.size()<=0) {
+					if( carth_space.size() <= 0 ) {
 						std::cout << "FATAL:: FAILED TO GET COORDINATES" << std::endl;
 						return(1);
 					}
@@ -131,11 +131,13 @@ int main (int argc, char **argv) {
 	old_layer.push_back(n0);
 
 	int C = 1;
-	while( solved_layer.size() != carth_space.size() )
+
+	std::vector<int> clu_ndx,cen_ndx;
+	while ( solved_layer.size() != carth_space.size() )
 	{
 		richanalysis::layer current_layer;
 		current_layer.clear();
-		while( !old_layer.empty() )
+		while ( !old_layer.empty() )
 		{
 			richanalysis::node wnode	= old_layer.back();
 			old_layer.pop_back();
@@ -150,17 +152,18 @@ int main (int argc, char **argv) {
 				current_layer.insert( current_layer.end() , new_layer.begin() , new_layer.end() );
 			}
 
-			if( C++ == 1 )
+			if ( C++ == 1 )
 			{
-				std::vector<int> clu_ndx	= anode.cluster_index_order();
-				std::cout << "INFO::HAVE NDX SIZE " << clu_ndx.size() << std::endl; 
+				clu_ndx	= anode.cluster_index_order();
+				cen_ndx = n0.first.get_clabels();
+				std::cout << "INFO:: HAVE NDX SIZE " << clu_ndx.size() << std::endl; 
 				std::vector<int> den_ndx	= n0.first.get_labels();
 				fIO.output_pdb("clu-nofit-n" + ns + ".pdb", carth_space , clu_ndx ); 
 				fIO.output_pdb("den-nofit-n" + ns + ".pdb", coord_space , den_ndx );
 			}
 		}
 
-		while( !current_layer.empty() )
+		while ( !current_layer.empty() )
 		{
 			richanalysis::node wnode	= current_layer.back(); 
 			current_layer.pop_back();
@@ -181,17 +184,54 @@ int main (int argc, char **argv) {
 	richanalysis::layer_analysis	alayer(solved_layer);
 	alayer.output_layer("solvedThis.pdb");
 
-////ALTERNATIVE
-	std::cout <<"ALTERNATIVE"<<std::endl;
+//// ALTERNATIVE
+	std::cout << " ALTERNATIVE " << std::endl;
 	richanalysis::particle_analysis pa;
-	pa.assign_particles(coord_space,carth_space);
-	std::vector< std::pair<ftyp, std::pair< int, int > > > atomlist = pa.compare_dist_matrices(1.5);
+	pa.assign_particles(coord_space, carth_space);
+	std::vector< std::pair<ftyp, std::pair< int, int > > > atomlist = pa.compare_dist_matrices(2.0);
 	std::cout << "INFO::"  << atomlist.size() << std::endl;
-	for(int i=0 ; i<atomlist.size() ; i++ )
-		std::cout << "INFO::" << atomlist[i].first << " " 
-			<< atomlist[i].second.first << " TO " 
-			<< atomlist[i].second.second << std::endl;
+
+	int imax=0;
+	for(int i=0 ; i< atomlist.size() ; i++ ){
+		imax = ( atomlist[i].second.first )>(imax)?( atomlist[i].second.first ):(imax);
+		imax = ( atomlist[i].second.second)>(imax)?( atomlist[i].second.second):(imax);
+	}
+
+	std::cout << "INFO::LARGEST::INDEX::" << imax << std::endl;
+	int i1,i2;
+	std::vector<int> vi1, vi2, vi_fin;
+
+	for( int i=0 ; i<B ; i++ ) {
+		vi1.push_back(1);
+		vi2.push_back(1);
+		vi_fin.push_back(-1);
+	}
+
+	for( int i=0 ; i<atomlist.size() ; i++ ) {
+		i1 = atomlist[i].second.first ;
+		i2 = atomlist[i].second.second;
+		if( vi_fin[i1] < 0 && vi2[i2] ) {
+			vi_fin[i1]	= i2;
+			vi2[i2]		=  0;
+			vi1[i1]		=  0;
+			imax--;
+		}
+		if(imax == 0)
+			break;
+	}
+
+	std::cout << "INFO::HAVE::RELATION::" << std::endl;
+	for( int i=0 ; i<B ; i++ ) 
+		std::cout << " " << vi_fin[i]  << std::endl;
+	std::cout << std::endl;
+
+	std::cout << "INFO" << clu_ndx.size() << std::endl;
+	for( int i = 0 ; i < clu_ndx.size() ; i++ )
+		std::cout << " " <<  clu_ndx[i] ;
+
+	std::cout << std::endl;
 
 	pa.output_result("pastuff.pdb");
+
 	return 0;
 }

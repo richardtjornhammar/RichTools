@@ -66,6 +66,7 @@ namespace richanalysis {
 			int		set_matrix( particles ); 
 			int		find_centroids( void );
 			std::vector<int>	get_labels( void );
+			std::vector<int>	get_clabels( void );
 
 			void		copyC(gmat *C0) { 
 						if(C0->size1==C_->size1&&C0->size2==C_->size2) { gsl_matrix_memcpy(C0, C_); } 
@@ -116,6 +117,15 @@ namespace richanalysis {
 							pi.first=parents_.first.length_M();
 							pi.second=parents_.second.length_M();
 							return pi; };
+			void			copyv(gvec *v0, int sw) { 
+							if(sw==1) { parents_.first .copyv(v0); }
+							if(sw==2) { parents_.second.copyv(v0); } 
+						};
+			void			copyw(gvec *w0, int sw) { 
+							if(sw==1) { parents_.first .copyw(w0); }
+							if(sw==2) { parents_.second.copyw(w0); } 
+						};
+
 			bool			assign_node( node n );
 			bool			allSet()	{ return ( bNode_ && bLayer_ ); };
 			bool			haveNode()	{ return ( bNode_); };
@@ -149,7 +159,7 @@ namespace richanalysis {
 			std::vector< int >	find_via_distance	( gmat *A, ftyp level );
 			std::vector<int> 	outp_distance_matrix	( gmat *A, ftyp level );
 			std::vector<int> 	outp_distance_matrix	( ftyp level ) { 
-						return outp_distance_matrix( A_, level );};
+						return outp_distance_matrix( A_, level ); };
 			std::vector< std::pair<ftyp, std::pair< int, int > > >	compare_dist_matrices(gmat *A, gmat *B, ftyp val);
 			std::vector< std::pair<ftyp, std::pair< int, int > > >	compare_dist_matrices(ftyp val) { 
 						 return compare_dist_matrices(A_,B_,val); };
@@ -162,7 +172,7 @@ namespace richanalysis {
 					model_.clear(); model_.insert( model_.end() , pd.begin() , pd.end() );					
 				} 
 				bAssigned_ = true; 
-				assign_matrices();};
+				assign_matrices(); };
 			void			assign_matrices( void );
 			int	check(){ return M_->size2; };
 			void	output_result( std::string );
@@ -203,15 +213,15 @@ namespace richanalysis {
 			int			perform_clustering( void );
 			int			length_C(void){ return C_->size2; };
 			int			length_M(void){ return M_->size2; };
-			void	copyC(gmat *C0){ if(C0->size1==C_->size1&&C0->size2==C_->size2) { gsl_matrix_memcpy(C0, C_); } };
-			void	copyM(gmat *M0){ if(M0->size1==M_->size1&&M0->size2==M_->size2) { gsl_matrix_memcpy(M0, M_); } };
-			void	setM( gmat *M0){ if(M0->size1==M_->size1&&M0->size2==M_->size2) { gsl_matrix_memcpy(M_, M0); } };
-			void	copyUc(gmat *U0){ if(U0->size1==Uc_->size1&&U0->size2==Uc_->size2) { gsl_matrix_memcpy(U0, Uc_); } };
-			void	copytc(gvec *tc0){ if(tc0->size ==tc_->size) { gsl_vector_memcpy(tc0, tc_); } };
-			void	copyv(gvec *v0){ if(v0->size ==vc_->size) { gsl_vector_memcpy(v0, vc_); } };
-			void	copyw(gvec *w0){ if(w0->size ==wc_->size) { gsl_vector_memcpy(w0, wc_); } };
-			int	NpC(int i){ if(NperC_.size()>0&&i<NperC_.size()){ return NperC_[i]; } };
-			bool			isSet(){return bSet_[0]>0&&bSet_[1]>0&&bSet_[2]>0&&bSet_[3]>0;}
+			void	copyC(gmat *C0)		{ if(C0->size1==C_->size1&&C0->size2==C_->size2) { gsl_matrix_memcpy(C0, C_); } };
+			void	copyM(gmat *M0)		{ if(M0->size1==M_->size1&&M0->size2==M_->size2) { gsl_matrix_memcpy(M0, M_); } };
+			void	setM( gmat *M0)		{ if(M0->size1==M_->size1&&M0->size2==M_->size2) { gsl_matrix_memcpy(M_, M0); } };
+			void	copyUc(gmat *U0)	{ if(U0->size1==Uc_->size1&&U0->size2==Uc_->size2) { gsl_matrix_memcpy(U0, Uc_); } };
+			void	copytc(gvec *tc0)	{ if(tc0->size ==tc_->size) { gsl_vector_memcpy(tc0, tc_); } };
+			void	copyv(gvec *v0)		{ if(v0->size ==vc_->size) { gsl_vector_memcpy(v0, vc_); } };
+			void	copyw(gvec *w0)		{ if(w0->size ==wc_->size) { gsl_vector_memcpy(w0, wc_); } };
+			int	NpC(int i)		{ if(NperC_.size()>0&&i<NperC_.size()){ return NperC_[i]; } };
+			bool			isSet()	{return bSet_[0]>0&&bSet_[1]>0&&bSet_[2]>0&&bSet_[3]>0;}
 			ftyp			find_shape();
 		//! Calculates the shape
 			ftyp			shape(	gmat *P , gmat *U , gvec *t 	);
