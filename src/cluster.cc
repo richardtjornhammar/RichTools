@@ -303,6 +303,82 @@ cluster::set_matrix( particles coord_space ) {
 	return  reval;
 }
 
+bool sort_func(std::pair<ftyp, std::pair< int, int > > i1,std::pair<ftyp, std::pair< int, int > > i2) {
+	return (i1.first<i2.first);
+};
+
+void
+node_analysis::centroid_to_nearest(void) {
+	gmat *C1 = gsl_matrix_calloc(DIM, parents_.first.length_C() );
+	gmat *C2 = gsl_matrix_calloc(DIM, parents_.second.length_C() );
+
+	parents_.first.copyC(C1);
+	parents_.second.copyC(C2);
+
+	std::vector< std::pair<ftyp, std::pair< int, int > > > vi;
+
+	if(C1->size2!=C2->size2)
+		std::cout << "ERROR::ERROR::WILL::MALFUNCTION::" << std::endl;
+
+	gvec *va = gsl_vector_calloc(DIM);
+	gvec *vb = gsl_vector_calloc(DIM);
+	gvec *v1c = gsl_vector_calloc(DIM);
+	gvec *v2c = gsl_vector_calloc(DIM);
+
+	for(int i=0 ; i<C1->size2 ; i++ ) {
+		ftyp diff=1E10,dotn2;
+		for( int j=0 ; j<C2->size2 ; j++ ) {
+			gsl_matrix_get_col ( va, C1, i );
+			gsl_matrix_get_col ( vb, C2, j );
+			gsl_vector_sub( va, vb );
+			diff=gsl_blas_dnrm2(va);
+			std::pair<ftyp, std::pair<int, int> > rel;
+			rel.first = diff; rel.second.first=i; rel.second.second=j;
+			vi.push_back(rel);
+		}
+	}
+	std::sort (vi.begin(), vi.end(), sort_func);
+
+	std::vector<int> vi1, vi2, vi_fin;
+	for( int i=0 ; i<C1->size2 ; i++ ) {
+		vi1.push_back(1);
+		vi2.push_back(1);
+		vi_fin.push_back(-1);
+	}
+	int i1,i2;
+	for( int i=0 ; i<vi.size() ; i++ ) {
+		i1 = vi[i].second.first ;
+		i2 = vi[i].second.second;
+		if( vi_fin[i2] < 0 && vi1[i1] ) {
+			vi_fin[i2]	= i1;
+			vi1[i1]		=  0;
+			vi2[i2]		=  0;
+		}
+	}
+
+	gsl_matrix *P	= gsl_matrix_calloc(DIM,parents_.second.length_M());
+	gsl_vector *v	= gsl_vector_calloc(parents_.second.length_M());
+	parents_.second.copyM(P);
+	parents_.second.copyv(v);
+	richanalysis::coord_format cf;
+	for( int i=0 ; i<vi_fin.size() ; i++ )
+		std::cout << "INFO:: " << vi_fin[i] << std::endl;
+	particles pf;
+	pf 		= cf.mat2par (P, v);
+	for( int i=0 ; i<pf.size() ; i++ ){
+		pf[i].first = "C";
+		int ci	= gsl_vector_get(v,i);
+		int ti	= vi_fin[ci];
+// shift according to centroids
+	}
+
+	gsl_matrix_free(C2);
+	gsl_matrix_free(C1);
+	gsl_vector_free(va);
+	gsl_vector_free(vb);
+
+}
+
 particles
 node_analysis::seeded_centroids() { 
 
@@ -370,13 +446,14 @@ node_analysis::assign_node( node n ) {
 
 	n.first.find_centroids();
 	n.second.find_centroids();
+	std::cout << "INFOINFO::HAVE::length_C:: " << n.second.length_C() << std::endl;
 	cluster c1 = n.first;
 	cluster c2 = n.second;
 	std::vector<int> cindx;
 
 	int N, M, L, K;
 	int rDIM=c1.get_cDIM();
-
+	std::cout << "INFOINFO::HAVE::CDIM:: " << rDIM << std::endl;
 	if( c1.get_cDIM() != c2.get_cDIM() ) {
 		std::cout << "ERROR WITH DIMENSION OF CLUSTER PAIRS" << std::endl;
 		bNode_= false; bLayer_= false;
@@ -390,7 +467,7 @@ node_analysis::assign_node( node n ) {
 		N = c2.length_M();
 		M = c2.length_C();
 		K = c1.length_C();
-
+		std::cout << "INFOINFO::HAVE::M:: " << M << std::endl;
 		if( K == M && M == rDIM && rDIM>1 ) {
 
 			std::vector<int> vi;

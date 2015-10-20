@@ -88,12 +88,23 @@ namespace richanalysis {
 					};
 
 			int		get_cDIM(void)		{ return rDIM_; 	};	//	centroid dimension
-			void		set_cDIM(int rDIM)	{ rDIM_=rDIM;		};	//	centroid dimension
+			void		set_cDIM(int rDIM)	{ rDIM_=rDIM; 
+						if(bSet_) { 
+							gsl_matrix_free(C_); 
+							C_=gsl_matrix_calloc(DIM,rDIM); 
+							gsl_vector_free(wc_); 
+							gsl_vector_calloc(rDIM); }		};	//	centroid dimension
 			int		length_C(void)		{ return C_->size2;	};
 			int		length_M(void)		{ return M_->size2;	};
 			bool		isSet(void)		{ return ( bSet_ );	};	
 			ids		getIDs(void)		{ return (idlabels_);	};
 			void		setIDs(ids vid)		{ idlabels_ = vid ;	};
+			void		print_all( void ) {
+							output_matrix( M_ );
+							output_vector(vc_ );
+							output_matrix( C_ );
+							output_vector(wc_ );
+						} ;
 		private:
 			gmat	*M_; 		// 0 THE ORIGINAL COORDINATES 
 			gmat	*C_; 		// 1 THE CENTROIDS
@@ -129,12 +140,13 @@ namespace richanalysis {
 							if(sw==1) { parents_.first .copyw(w0); }
 							if(sw==2) { parents_.second.copyw(w0); } 
 						};
-
+			void			centroid_to_nearest(void);
 			bool			assign_node( node n );
 			bool			allSet()	{ return ( bNode_ && bLayer_ ); };
 			bool			haveNode()	{ return ( bNode_); };
 			bool			haveLayer()	{ return ( bLayer_ ); };
-			layer			get_node_layer( void ){ return children_; };			
+			layer			get_node_layer( void ){ return children_; };	
+			void			print_all(void){ parents_.first.print_all();parents_.second.print_all();};		
 			~node_analysis(){};
 		private:
 			node	parents_;

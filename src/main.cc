@@ -185,7 +185,7 @@ int main (int argc, char **argv) {
 	alayer.output_layer("solvedThis.pdb");
 
 //// ALTERNATIVE
-	richanalysis::node_analysis new_node(n0);
+	richanalysis::node_analysis new_node(n0);	
 	std::cout << "::SEEDED KMEANS::" << std::endl;
 //	DONE AFTER RIGID FIT
 	particles s_aligned = new_node.seeded_centroids();
@@ -193,6 +193,14 @@ int main (int argc, char **argv) {
 	for( int i=0 ; i<s_aligned.size() ; i++ )
 		s_aligned[i].first = carth_space[i].first;
 	fIO.output_pdb("test-n" + ns + ".pdb", s_aligned );
+
+	std::cout << "::ALTERNATIVE::" << std::endl;
+	n0.first.set_cDIM(5);
+	n0.second.set_cDIM(5);
+	n0.first.find_centroids();
+	n0.second.find_centroids();
+	richanalysis::node_analysis nnode(n0);
+	nnode.centroid_to_nearest();
 
 	std::cout << "::ALTERNATIVE::" << std::endl;
 	richanalysis::particle_analysis pa;
@@ -215,7 +223,6 @@ int main (int argc, char **argv) {
 		vi2.push_back(1);
 		vi_fin.push_back(-1);
 	}
-
 	for( int i=0 ; i<atomlist.size() ; i++ ) {
 		i1 = atomlist[i].second.first ;
 		i2 = atomlist[i].second.second;
@@ -234,7 +241,6 @@ int main (int argc, char **argv) {
 	std::cout << "INFO" << clu_ndx.size() << std::endl;
 	for( int i = 0 ; i < clu_ndx.size() ; i++ )
 		std::cout << " " <<  clu_ndx[i] ;
-
 	std::cout << std::endl;
 
 	pa.output_result("pastuff.pdb");
