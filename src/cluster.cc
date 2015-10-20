@@ -303,6 +303,32 @@ cluster::set_matrix( particles coord_space ) {
 	return  reval;
 }
 
+particles
+node_analysis::seeded_centroids() { 
+
+	particles pf;
+
+	gmat *M = gsl_matrix_calloc(DIM, parents_.first.length_M() );
+	gmat *C = gsl_matrix_calloc(DIM, parents_.second.length_M() );
+	gvec *v = gsl_vector_calloc(parents_.first.length_M()  );
+	gvec *w = gsl_vector_calloc(parents_.second.length_M() );
+
+	parents_.first.copyM(M);
+	parents_.second.copyM(C);
+	parents_.first.gsl_seeded_kmeans( M , v , C , w );
+
+	richanalysis::coord_format cf;
+	gsl_vector_set_all(w,1);
+	pf 	= cf.mat2par (C, w);
+
+	gsl_matrix_free(M);
+	gsl_matrix_free(C);
+	gsl_vector_free(v);
+	gsl_vector_free(w);
+
+	return pf;
+}
+
 int
 cluster::find_centroids(){
 	if( bSet_ ) {
@@ -423,6 +449,41 @@ node_analysis::assign_node( node n ) {
 	}
 
 	return bNode_;
+}
+
+particles
+node_analysis::regular_fit(void) {
+
+	particles pf;
+	cluster c1 	= parents_.first;
+	cluster c2 	= parents_.second;
+
+	gmat *P 	= gsl_matrix_calloc( DIM, c2.length_M());
+	gmat *Q 	= gsl_matrix_calloc( DIM, c1.length_M());
+	gmat *U 	= gsl_matrix_calloc( DIM, DIM);
+	gmat *iU 	= gsl_matrix_calloc( DIM, DIM);
+	gvec *it 	= gsl_vector_calloc( DIM );
+	gvec *t 	= gsl_vector_calloc( DIM );
+	gvec *vl 	= gsl_vector_calloc( c2.length_M() );
+
+	richanalysis::coord_format cf;
+
+	gsl_vector_set_all(vl,1);
+	c2.copyM(P);
+	c1.copyM(Q);
+
+	pf 		= cf.mat2par (P, vl);
+
+	std::cout << "INFOINFOINFO>" << c1.length_M() << " " << c2.length_M() << std::endl;
+
+	ftyp rmsd	= shape_fit( P, Q, U, t, 1);
+	invert_fit	( U, t, iU, it );
+	apply_fit( pf, iU, it ); 
+
+	for( int i=0 ; i<pf.size() ; i++ )
+		pf[i].first = "C";
+
+	return pf;
 }
 
 std::vector<int> 
@@ -694,6 +755,74 @@ clustering::connectivity(gsl_matrix *B, ftyp val) {
 		std::cout << "CLUSTER " << i << " HAS " << Nc[i] << " ELEMENTS" << std::endl ;
 
 	return(0);   
+}
+
+int 
+clustering::gsl_seeded_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw ){
+	int NN=dat->size2, MM=dat->size1, KK=cent->size2;
+
+	gvec *labels = gsl_vector_calloc(NN);
+	gvec *counts = gsl_vector_calloc(KK);
+	gmat *tmp_ce = gsl_matrix_calloc(MM,KK);
+
+	if( ((int)cent->size1)!=MM || !gsl_vector_isnonneg(w) || ((int)w->size)!=NN || ((int)nw->size)!=KK )	{
+		std::cout << "ERROR::BAD::KMEANS" << std::endl;
+		return -1;
+	}
+	gsl_vector_set_zero(nw);
+	gsl_vector_set_zero(w);
+
+	int h, i, j;
+	ftyp old_error, error, TOL=1E-4; 
+
+	do {
+		old_error = error, error = 0; 
+		for (i = 0; i < KK; i++ ) {
+			gsl_vector_set(counts,i,0);
+			for (j = XX; j <= ZZ; j++){
+				gsl_matrix_set(tmp_ce,j,i,0.0);
+			}
+ 		}
+		for (h = 0; h < NN; h++) {
+			ftyp min_distance = 1E30;
+			for (i = 0; i < KK; i++) {
+				ftyp distance = 0;
+				for ( j = XX; j<=ZZ ; j++ ) {
+					distance += square( gsl_matrix_get( dat,j,h ) - gsl_matrix_get( cent,j,i ) );
+				}
+				if (distance < min_distance) {
+	 				gsl_vector_set(labels,h,i); min_distance = distance; 
+				} 
+			} 
+			for ( j=XX ; j<=ZZ ; j++ ){
+ 				gsl_matrix_set( tmp_ce, j, gsl_vector_get(labels,h),
+				 gsl_matrix_get( dat, j, h ) + gsl_matrix_get(tmp_ce, j, gsl_vector_get(labels,h)) );
+			}
+			gsl_vector_set(counts,gsl_vector_get(labels,h),1.0+gsl_vector_get(counts,gsl_vector_get(labels,h)));
+	 		error += min_distance; 
+		}
+	 	for (i = 0; i < KK; i++) {
+	 		for ( j=XX ; j<=ZZ ; j++ ) {
+				gsl_matrix_set(cent,j,i,
+				gsl_vector_get(counts,i)?(gsl_matrix_get(tmp_ce,j,i)/gsl_vector_get(counts,i)):(gsl_matrix_get(tmp_ce,j,i)));
+	 		}
+	 	}
+	} while ( fabs(error - old_error) > TOL );	// WHILE THEY ARE MOVING
+
+	ftyp wi=0.0, nwh=0.0;
+	for( i=0 ; i<NN ; i++) {
+		h 	= gsl_vector_get(labels,i);
+		wi	= gsl_vector_get(w,i);
+		nwh	= gsl_vector_get(nw,h);
+		gsl_vector_set(w,i,h);		// MIGHT NOT WANT TO OVERWRITE THIS
+		gsl_vector_set(nw,h,nwh+wi); 		// NOT NORMALIZED HERE
+	}
+
+	gsl_vector_free(labels); 
+	gsl_vector_free(counts);
+	gsl_matrix_free(tmp_ce);
+
+	return 0;
 }
 
 

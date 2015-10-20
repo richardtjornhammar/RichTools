@@ -119,7 +119,7 @@ int main (int argc, char **argv) {
 	richanalysis::layer	old_layer;
 	richanalysis::layer	solved_layer;
 	richanalysis::node	n0;
-	if(D>=B){
+	if( D>=B ){
 		n0.first.set_matrix(coord_space);
 		n0.second.set_matrix(carth_space);
 	}else{
@@ -185,7 +185,16 @@ int main (int argc, char **argv) {
 	alayer.output_layer("solvedThis.pdb");
 
 //// ALTERNATIVE
-	std::cout << " ALTERNATIVE " << std::endl;
+	richanalysis::node_analysis new_node(n0);
+	std::cout << "::SEEDED KMEANS::" << std::endl;
+//	DONE AFTER RIGID FIT
+	particles s_aligned = new_node.seeded_centroids();
+
+	for( int i=0 ; i<s_aligned.size() ; i++ )
+		s_aligned[i].first = carth_space[i].first;
+	fIO.output_pdb("test-n" + ns + ".pdb", s_aligned );
+
+	std::cout << "::ALTERNATIVE::" << std::endl;
 	richanalysis::particle_analysis pa;
 	pa.assign_particles(coord_space, carth_space);
 	std::vector< std::pair<ftyp, std::pair< int, int > > > atomlist = pa.compare_dist_matrices(2.0);
@@ -197,7 +206,7 @@ int main (int argc, char **argv) {
 		imax = ( atomlist[i].second.second)>(imax)?( atomlist[i].second.second):(imax);
 	}
 
-	std::cout << "INFO::LARGEST::INDEX::" << imax << std::endl;
+	std::cout << "INFO::LARGEST::INDEX::" << imax+1 << std::endl;
 	int i1,i2;
 	std::vector<int> vi1, vi2, vi_fin;
 
@@ -216,10 +225,7 @@ int main (int argc, char **argv) {
 			vi1[i1]		=  0;
 			imax--;
 		}
-		if(imax == 0)
-			break;
 	}
-
 	std::cout << "INFO::HAVE::RELATION::" << std::endl;
 	for( int i=0 ; i<B ; i++ ) 
 		std::cout << " " << vi_fin[i]  << std::endl;

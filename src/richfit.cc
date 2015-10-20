@@ -286,7 +286,12 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 	calc_vmprod( w2, Q, w2Q );
 	gsl_matrix_memcpy( P_0, w1P );
 	gsl_matrix_memcpy( Q_0, w2Q );
-
+/*
+	gsl_matrix_memcpy( w1P, P); //w1P );
+	gsl_matrix_memcpy( w2Q, Q); //w2Q );
+	gsl_matrix_memcpy( P_0, P); //w1P );
+	gsl_matrix_memcpy( Q_0, Q); //w2Q );
+*/
 	gsl_matrix *DIF	= gsl_matrix_alloc( D, D );
 	gsl_matrix *sqP = gsl_matrix_calloc( D, D );
 	gsl_matrix *sqQ = gsl_matrix_calloc( D, D );
@@ -336,6 +341,12 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 	ftyp total_rmsd	= 0.0 , total_min_rmsd	= 1e10;
 	ftyp xi 	= 1.0 , gau_norm 	= 1.0/sqrt(2.0*M_PI)/xi;
 
+	double dval,dv1,dv2;
+	dv1	= get_det(V1);
+	dv2	= get_det(V2);
+	dval	= dv1*dv2;
+	std::cout << "NOISY::INFO::" << dval << " " << dv1 << " "<< dv2 << std::endl;
+		
 	for(int II=0;II<8;II++)
 	{
 		gsl_vector_memcpy( tt, p0 );
@@ -354,6 +365,11 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 			case  5: gsl_matrix_set  ( EYE,  YY, YY, -1.0 ); break;
 			case  6: gsl_matrix_set  ( EYE,  ZZ, ZZ, -1.0 ); break;
 			case  7: gsl_matrix_scale( EYE, -1.0); break;
+			case  8: // for playing around
+//				gsl_matrix_set  ( EYE,  XX, XX, dval );
+//				gsl_matrix_set  ( EYE,  YY, YY, dv2 );
+				gsl_matrix_set  ( EYE,  ZZ, ZZ, dval ); 
+				break;
 			default: break;
 		}
 
@@ -381,23 +397,24 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 			}
 		} else {
 			gsl_blas_dgemm(CblasNoTrans,CblasNoTrans, 1.0, Ut, P_0, 0.0, P_1 );
-			ftyp tot_cnt=1.0;	
+			ftyp tot_cnt	= 1.0;
+			min_rmsd 	= 0;	
 			for(int i=0;i<P_1->size2;i++) {
 				for(int j=0;j<Q_0->size2;j++) {
 					double x2	= square( gsl_matrix_get(P_1,XX,i)-gsl_matrix_get(Q_0,XX,j) );
 					double y2	= square( gsl_matrix_get(P_1,YY,i)-gsl_matrix_get(Q_0,YY,j) );
 					double z2	= square( gsl_matrix_get(P_1,ZZ,i)-gsl_matrix_get(Q_0,ZZ,j) );
 					double r2	= x2+y2+z2;
-					total_rmsd	+= r2;
+					min_rmsd	+= r2;
 					tot_cnt		+= 1.0;
 				}
 			}
-			total_rmsd/=tot_cnt;
-	
-			if( total_rmsd < min_rmsd ){
+			min_rmsd/=tot_cnt;
+
+			if(  min_rmsd < total_min_rmsd  ){
 				gsl_matrix_memcpy( U , Ut );
 				gsl_vector_memcpy( t , tt );
-				min_rmsd = total_rmsd;
+				total_min_rmsd = min_rmsd;
 			}
 		}
 	}
