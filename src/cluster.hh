@@ -140,7 +140,7 @@ namespace richanalysis {
 							if(sw==1) { parents_.first .copyw(w0); }
 							if(sw==2) { parents_.second.copyw(w0); } 
 						};
-			void			centroid_to_nearest(void);
+			particles		centroid_to_nearest( void );
 			bool			assign_node( node n );
 			bool			allSet()	{ return ( bNode_ && bLayer_ ); };
 			bool			haveNode()	{ return ( bNode_); };
@@ -194,12 +194,17 @@ namespace richanalysis {
 			void	output_result( std::string );
 			bool			complete( void ) { return bAssigned_; };
 			bool			matrices( void ) { return bMatrices_; };
+			std::vector<int>	return_idx(void) { return rel_idx_; };
+			void		copyC(gmat *C0) { 
+						if(C0->size1==C_->size1&&C0->size2==C_->size2) { gsl_matrix_memcpy(C0, C_); } 
+					};
 			particles		output_reduced_density(void);
 		private:
 			bool bAssigned_, bMatrices_;
 			particles density_;
 			particles model_;
 			ftyp	rcut_;
+			std::vector<int>  rel_idx_;
 			gmat	*A_, *B_;
 			gmat	*C_, *M_;			
 			gvec	*vc_;		// 0 UNSORTED LABELS

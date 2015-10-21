@@ -286,12 +286,7 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 	calc_vmprod( w2, Q, w2Q );
 	gsl_matrix_memcpy( P_0, w1P );
 	gsl_matrix_memcpy( Q_0, w2Q );
-/*
-	gsl_matrix_memcpy( w1P, P); //w1P );
-	gsl_matrix_memcpy( w2Q, Q); //w2Q );
-	gsl_matrix_memcpy( P_0, P); //w1P );
-	gsl_matrix_memcpy( Q_0, Q); //w2Q );
-*/
+
 	gsl_matrix *DIF	= gsl_matrix_alloc( D, D );
 	gsl_matrix *sqP = gsl_matrix_calloc( D, D );
 	gsl_matrix *sqQ = gsl_matrix_calloc( D, D );
@@ -337,7 +332,7 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 
 	ftyp cnt=(ftyp)DIM;
 
-	ftyp rmsd	= 0.0 , min_rmsd	= 1e10;
+	ftyp rmsd	= 0.0 , min_rmsd	= type>0?1e10:0.0;
 	ftyp total_rmsd	= 0.0 , total_min_rmsd	= 1e10;
 	ftyp xi 	= 1.0 , gau_norm 	= 1.0/sqrt(2.0*M_PI)/xi;
 
@@ -345,9 +340,8 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 	dv1	= get_det(V1);
 	dv2	= get_det(V2);
 	dval	= dv1*dv2;
-	std::cout << "NOISY::INFO::" << dval << " " << dv1 << " "<< dv2 << std::endl;
 		
-	for(int II=0;II<8;II++)
+	for(int II=0; II<8; II++)
 	{
 		gsl_vector_memcpy( tt, p0 );
 		gsl_matrix_set_identity( EYE );
@@ -366,8 +360,8 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 			case  6: gsl_matrix_set  ( EYE,  ZZ, ZZ, -1.0 ); break;
 			case  7: gsl_matrix_scale( EYE, -1.0); break;
 			case  8: // for playing around
-//				gsl_matrix_set  ( EYE,  XX, XX, dval );
-//				gsl_matrix_set  ( EYE,  YY, YY, dv2 );
+				gsl_matrix_set  ( EYE,  XX, XX, dv2 );
+				gsl_matrix_set  ( EYE,  YY, YY, dv1 );
 				gsl_matrix_set  ( EYE,  ZZ, ZZ, dval ); 
 				break;
 			default: break;
@@ -375,11 +369,13 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 
 		gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, V2, 0.0, TMP ); 
 		gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, V1, TMP, 0.0, C ); 	
+		int dC = get_det(C);
 
 		gsl_matrix_memcpy( Ut , C );
 		gsl_blas_dgemv( CblasNoTrans, -1.0, Ut, q0, 1.0, tt );
 
-		if( type == 1 ) {
+		switch(type) {
+			case 2:	{
 			gsl_matrix_memcpy( DIF, sqQ0 );
 			gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, Ut, sqP0, -1.0, DIF );
 		
@@ -395,8 +391,9 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 				gsl_vector_memcpy( t , tt );
 				min_rmsd = rmsd;
 			}
-		} else {
-			gsl_blas_dgemm(CblasNoTrans,CblasNoTrans, 1.0, Ut, P_0, 0.0, P_1 );
+				} break;
+			case 1: {
+			gsl_blas_dgemm(CblasTrans,CblasNoTrans, 1.0, Ut, P_0, 0.0, P_1 );
 			ftyp tot_cnt	= 1.0;
 			min_rmsd 	= 0;	
 			for(int i=0;i<P_1->size2;i++) {
@@ -411,18 +408,46 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 			}
 			min_rmsd/=tot_cnt;
 
-			if(  min_rmsd < total_min_rmsd  ){
+			if(  min_rmsd < total_min_rmsd  ) {
 				gsl_matrix_memcpy( U , Ut );
 				gsl_vector_memcpy( t , tt );
 				total_min_rmsd = min_rmsd;
 			}
-		}
+				} break;
+			default:{
+			gsl_blas_dgemm(CblasNoTrans,CblasNoTrans, 1.0, Ut, P_0, 0.0, P_1 );
+			ftyp tot_cnt	= 0.0;
+			min_rmsd	= 0.0;
+			rmsd	= 0.0;
+			for(int i=0; i<P_1->size2;i++ ) {	
+				double rpow	= 1e3;
+				for(int j=0;j<Q_0->size2;j++) {
+					double x2	= square( gsl_matrix_get(P_1,XX,i)-gsl_matrix_get(Q_0,XX,j) );
+					double y2	= square( gsl_matrix_get(P_1,YY,i)-gsl_matrix_get(Q_0,YY,j) );
+					double z2	= square( gsl_matrix_get(P_1,ZZ,i)-gsl_matrix_get(Q_0,ZZ,j) );
+					double r2	= (x2+y2+z2);
+					rpow		= r2<rpow?r2:rpow;
+					min_rmsd	+= r2*r2;
+					rmsd		+= r2;
+					tot_cnt		+= 1.0;
+				}
+			}
+			min_rmsd/=tot_cnt;
+			if(  min_rmsd < total_min_rmsd ){
+				gsl_matrix_memcpy( U , Ut );
+				output_matrix(U);
+				gsl_vector_memcpy( t , tt );
+				total_min_rmsd = min_rmsd;
+			}			
+				} break;
+		}	
 	}
 
 	gsl_matrix_free(EYE);	gsl_matrix_free(sqP);
 	gsl_matrix_free(TMP);	gsl_matrix_free(sqQ);
 	gsl_matrix_free( C );	gsl_matrix_free(DIF);
 	gsl_matrix_free( V );
+gsl_matrix_free(Ut);gsl_vector_free(tt);
 	gsl_matrix_free(w1P);	gsl_matrix_free(w2Q);
 	gsl_matrix_free(U1);	gsl_matrix_free(U2);
 	gsl_matrix_free(V1);	gsl_matrix_free(V2);

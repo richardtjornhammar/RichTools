@@ -184,27 +184,54 @@ int main (int argc, char **argv) {
 	richanalysis::layer_analysis	alayer(solved_layer);
 	alayer.output_layer("solvedThis.pdb");
 
-//// ALTERNATIVE
-	richanalysis::node_analysis new_node(n0);	
-	std::cout << "::SEEDED KMEANS::" << std::endl;
-//	DONE AFTER RIGID FIT
-	particles s_aligned = new_node.seeded_centroids();
-
-	for( int i=0 ; i<s_aligned.size() ; i++ )
-		s_aligned[i].first = carth_space[i].first;
-	fIO.output_pdb("test-n" + ns + ".pdb", s_aligned );
-
 	std::cout << "::ALTERNATIVE::" << std::endl;
-	n0.first.set_cDIM(5);
-	n0.second.set_cDIM(5);
+	n0.first.set_cDIM(3);
+	n0.second.set_cDIM(3);
 	n0.first.find_centroids();
 	n0.second.find_centroids();
 	richanalysis::node_analysis nnode(n0);
-	nnode.centroid_to_nearest();
+//	particles c_aligned = nnode.centroid_to_nearest();
+	particles c_aligned = nnode.regular_fit();
+	for( int i=0 ; i<c_aligned.size() ; i++ )
+		c_aligned[i].first = carth_space[i].first;
+	fIO.output_pdb("test-can" + ns + ".pdb", c_aligned );
+
+//// ALTERNATIVE
+	richanalysis::node	n1;
+	if( D>=B ){
+		n1.first.set_matrix(coord_space);
+		n1.second.set_matrix(c_aligned);
+	}else{
+		n1.second.set_matrix(coord_space);
+		n1.first.set_matrix(c_aligned);
+	}
+	richanalysis::node_analysis new_node(n1);	
+	std::cout << "::SEEDED KMEANS::" << std::endl;
+//	DONE AFTER RIGID FIT
+//	particles s_aligned = new_node.seeded_centroids();
+//	for( int i=0 ; i<s_aligned.size() ; i++ ) {
+//		s_aligned[i].first = carth_space[i].first;
+//		gsl_vector_add(s_aligned[i].second,c_aligned[i].second);
+//		gsl_vector_scale(s_aligned[i].second,0.5);
+//	}
+//	fIO.output_pdb("test-n" + ns + ".pdb", s_aligned );
 
 	std::cout << "::ALTERNATIVE::" << std::endl;
 	richanalysis::particle_analysis pa;
-	pa.assign_particles(coord_space, carth_space);
+//	pa.assign_particles(coord_space, carth_space);
+	pa.assign_particles( coord_space, c_aligned  );
+	std::vector<int> ridx=pa.return_idx();
+	gmat *CM = gsl_matrix_calloc(DIM,B);
+	gvec *cv = gsl_vector_calloc(DIM);
+	pa.copyC(CM);
+//working here
+//	for(int i=0;i<ridx.size();i++){
+//		gsl_matrix_get_col(cv,CM,ridx[i]);
+//		gsl_vector_memcpy(c_aligned[i].second,cv);
+		//gsl_vector_scale(c_aligned[i].second,0.5);
+//	}
+	fIO.output_pdb("test-n" + ns + ".pdb", c_aligned );	
+
 	std::vector< std::pair<ftyp, std::pair< int, int > > > atomlist = pa.compare_dist_matrices(2.0);
 	std::cout << "INFO::"  << atomlist.size() << std::endl;
 
