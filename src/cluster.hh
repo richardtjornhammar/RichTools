@@ -124,8 +124,10 @@ namespace richanalysis {
 			node_analysis() { 		bNode_ = false; bLayer_ = false; 	};
 			node_analysis( node n ) { 	bNode_ = assign_node( n ); 		};
 			std::vector< int >	find_centroid_relation( void );
-			particles		regular_fit(void);
-			particles		seeded_centroids( void );
+			std::vector< int >	find_centroid_distance_relation( void );
+			particles		regular_fit(	void	);
+			particles		centroid_frag_fit(	void	);
+			particles		seeded_centroids(	void	);
 			std::vector< int >	global_index_order ( void ) { return glob_idx_order_; };
 			std::vector< int >	cluster_index_order( void ) { return cidx_; };
 			std::pair<int,int>	size(void){ std::pair<int,int> pi; 

@@ -182,7 +182,6 @@ int main (int argc, char **argv) {
 	}
 
 	richanalysis::layer_analysis	alayer(solved_layer);
-	alayer.output_layer("solvedThis.pdb");
 
 	std::cout << "::ALTERNATIVE::" << std::endl;
 	n0.first.set_cDIM(3);
@@ -190,23 +189,28 @@ int main (int argc, char **argv) {
 	n0.first.find_centroids();
 	n0.second.find_centroids();
 	richanalysis::node_analysis nnode(n0);
-//	particles c_aligned = nnode.centroid_to_nearest();
-	particles c_aligned = nnode.regular_fit();
+//	
+	particles c_aligned = nnode.regular_fit();		// shape fit
+	particles cc_aligned = nnode.centroid_frag_fit();	// alleviates permutation operation
 	for( int i=0 ; i<c_aligned.size() ; i++ )
 		c_aligned[i].first = carth_space[i].first;
-	fIO.output_pdb("test-can" + ns + ".pdb", c_aligned );
+	for( int i=0 ; i<cc_aligned.size() ; i++ )
+		cc_aligned[i].first = carth_space[i].first;
+	fIO.output_pdb("test-ccn" + ns + ".pdb", cc_aligned );
+	fIO.output_pdb("test-can" + ns + ".pdb",  c_aligned );
 
 //// ALTERNATIVE
 	richanalysis::node	n1;
-	if( D>=B ){
-		n1.first.set_matrix(coord_space);
-		n1.second.set_matrix(c_aligned);
-	}else{
-		n1.second.set_matrix(coord_space);
-		n1.first.set_matrix(c_aligned);
+	if( D >= B ) {
+		n1.first.set_matrix (	coord_space	);
+		n1.second.set_matrix(	c_aligned	);
+	} else {
+		n1.second.set_matrix(	coord_space	);
+		n1.first.set_matrix (	c_aligned	);
 	}
-	richanalysis::node_analysis new_node(n1);	
+	richanalysis::node_analysis new_node(	n1	);	
 	std::cout << "::SEEDED KMEANS::" << std::endl;
+
 //	DONE AFTER RIGID FIT
 //	particles s_aligned = new_node.seeded_centroids();
 //	for( int i=0 ; i<s_aligned.size() ; i++ ) {
@@ -225,7 +229,7 @@ int main (int argc, char **argv) {
 	gvec *cv = gsl_vector_calloc(DIM);
 	pa.copyC(CM);
 //working here
-//	for(int i=0;i<ridx.size();i++){
+//	for(int i=0;i<ridx.size();i++) {
 //		gsl_matrix_get_col(cv,CM,ridx[i]);
 //		gsl_vector_memcpy(c_aligned[i].second,cv);
 		//gsl_vector_scale(c_aligned[i].second,0.5);

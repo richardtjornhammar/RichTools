@@ -146,7 +146,7 @@ int
 particle_analysis::calc_distance_matrices(void) {
 
 	if( complete() ) {
-		if(A_) // CLUSTERED DENSITY
+		if(	A_	) // CLUSTERED DENSITY
 			gsl_matrix_free(A_);
 		A_  = gsl_matrix_alloc( C_->size2, C_->size2 );
 
@@ -356,6 +356,145 @@ bool sort_func(std::pair<ftyp, std::pair< int, int > > i1,std::pair<ftyp, std::p
 	return (i1.first<i2.first);
 };
 
+std::vector< int >
+node_analysis::find_centroid_distance_relation( void ) {
+
+	gmat *C1 = gsl_matrix_calloc(	DIM, parents_.first.length_C()	);
+	gmat *C2 = gsl_matrix_calloc(	DIM, parents_.second.length_C()	);
+	gvec *ci = gsl_vector_calloc(	parents_.second.length_M()	);
+
+	parents_.second	.copyv(ci);
+	parents_.first	.copyC(C1);
+	parents_.second	.copyC(C2);
+
+	std::vector< std::pair<ftyp, std::pair< int, int > > > vi;
+
+	if(C1->size2!=C2->size2)
+		std::cout << "ERROR::ERROR::WILL::MALFUNCTION::" << std::endl;
+
+	gvec *va  = gsl_vector_calloc( DIM );
+	gvec *vb  = gsl_vector_calloc( DIM );
+	gvec *v1c = gsl_vector_calloc( DIM );
+	gvec *v2c = gsl_vector_calloc( DIM );
+
+	for(int i=0 ; i<C1->size2 ; i++ ) {
+		ftyp diff=1E10,dotn2;
+		for( int j=0 ; j<C2->size2 ; j++ ) {
+			gsl_matrix_get_col ( va, C1, i );
+			gsl_matrix_get_col ( vb, C2, j );
+			gsl_vector_sub( va, vb );
+			diff=gsl_blas_dnrm2(va);
+			std::pair<ftyp, std::pair<int, int> > rel;
+			rel.first = diff*diff; rel.second.first=i; rel.second.second=j;
+			vi.push_back(rel);
+		}
+	}
+	std::sort (vi.begin(), vi.end(), sort_func);
+
+	std::vector<int> vi1, vi2, vi_fin;
+	for( int i=0 ; i<C1->size2 ; i++ ) {
+		vi1.push_back(		 1	);
+		vi2.push_back(		 1	);
+		vi_fin.push_back(	-1	);
+	}
+	int i1,i2;
+	for( int i=0 ; i<vi.size() ; i++ ) {
+		i1 = vi[i].second.first ;
+		i2 = vi[i].second.second;
+		if( vi_fin[i2] < 0 && vi1[i1] ) {
+			vi_fin[i2]	= i1;
+			vi1[i1]		=  0;
+			vi2[i2]		=  0;
+		}
+	}
+
+	return vi_fin; // should be unique id correspondance
+};
+
+bool sort_f00(std::pair< int, int >  i1, std::pair< int, int > i2) {
+	return (i1.second < i2.second);
+};
+
+particles
+node_analysis::centroid_frag_fit( void ) {
+	std::vector< int > cd_idx	=  find_centroid_distance_relation();
+//	std::vector< int > cd_idx	=  find_centroid_relation();
+	gmat *M1 = gsl_matrix_calloc( DIM, parents_.first .length_M() );
+	gmat *M2 = gsl_matrix_calloc( DIM, parents_.second.length_M() );
+	gvec *v1 = gsl_vector_alloc ( parents_.first .length_M() );
+	gvec *v2 = gsl_vector_alloc ( parents_.second.length_M() );
+	parents_.second.copyv(v2);
+	parents_.first .copyv(v1);
+	parents_.second.copyM(M2);
+	parents_.first .copyM(M1);
+
+	std::vector< std::pair<int,int> > i2c, c2i;
+	for( int i=0 ; i<parents_.second.length_M() ; i++ ){
+		std::pair<int,int> ip;
+		ip.first = i; ip.second = gsl_vector_get(v2,i);
+		i2c.push_back(ip);
+	}
+
+	for( int ic=0 ; ic<cd_idx.size() ; ic++ )
+		for( int i=0 ; i < i2c.size() ; i++ )
+			if(i2c[i].second==ic)
+				c2i.push_back(i2c[i]);
+
+	/*std::cout << " I2C :: " << i2c.size() << " ][ ";
+	for( int ic=0 ; ic < i2c.size() ; ic++ )
+		std::cout << " ( " << i2c[ic].first << ", " << i2c[ic].second << " ) " ;
+	std::cout << std::endl;
+	std::cout << " C2I :: " << c2i.size() << " ][ ";
+	for( int ic=0 ; ic < c2i.size() ; ic++ )
+		std::cout << " ( " << c2i[ic].first << ", " << c2i[ic].second << " ) " ;
+	std::cout << std::endl;*/
+
+	gmat *U 	= gsl_matrix_calloc( DIM, DIM );
+	gmat *iU 	= gsl_matrix_calloc( DIM, DIM );
+	gvec *it 	= gsl_vector_calloc( DIM );
+	gvec *t 	= gsl_vector_calloc( DIM );
+
+	particles parts;
+	richanalysis::coord_format cf;
+	for( int ic=0 ; ic<cd_idx.size() ; ic++ ){
+		particles dp	= cf.truncmat(M1,v1,cd_idx[ic]);
+ 		particles mp	= cf.truncmat(M2,v2,ic);
+		
+		gsl_matrix *P	= gsl_matrix_alloc(DIM,mp.size());
+		gsl_matrix *Q	= gsl_matrix_alloc(DIM,dp.size());
+		for(int i=0;i<dp.size();i++) {
+			gsl_matrix_set_col(Q,i,dp[i].second);
+		}
+		for(int i=0;i<mp.size();i++) {
+			gsl_matrix_set_col(P,i,mp[i].second);
+		}
+		ftyp rmsd	= shape_fit( P, Q, U, t, 1 ); 
+		std::cout << "INFO::RMSD::" << rmsd << std::endl;
+		invert_fit	( U, t, iU, it );
+		apply_fit	( mp, iU, it ); 
+		parts.insert( parts.end() , mp.begin() , mp.end() );
+		gsl_matrix_free(P);
+		gsl_matrix_free(Q);		
+	}
+
+	particles o_parts;
+	for(int i=0;i<parents_.second.length_M();i++){
+		o_parts.push_back( parts[c2i[i].first] );		
+	}
+
+	gsl_matrix_free( U );
+	gsl_vector_free( t );
+	gsl_matrix_free(iU );
+	gsl_vector_free(it );
+	gsl_matrix_free(M1 );
+	gsl_matrix_free(M2 );
+	gsl_vector_free(v1 );
+	gsl_vector_free(v2 );
+
+
+	return o_parts;
+};
+
 particles
 node_analysis::centroid_to_nearest(void) {
 	gmat *C1 = gsl_matrix_calloc(DIM, parents_.first.length_C() );
@@ -363,12 +502,7 @@ node_analysis::centroid_to_nearest(void) {
 	gvec *ci = gsl_vector_calloc(parents_.second.length_M());
 
 	parents_.second.copyv(ci);
-/*
-	std::cout << ">>CICICICICICICICICI<< " << ci->size << std::endl;
-	for(int i=0 ; i<ci->size ; i++ )
-		std::cout << " " << gsl_vector_get(ci,i);
-	std::cout << std::endl;
-*/
+
 	parents_.first.copyC(C1);
 	parents_.second.copyC(C2);
 
@@ -390,7 +524,7 @@ node_analysis::centroid_to_nearest(void) {
 			gsl_vector_sub( va, vb );
 			diff=gsl_blas_dnrm2(va);
 			std::pair<ftyp, std::pair<int, int> > rel;
-			rel.first = diff; rel.second.first=i; rel.second.second=j;
+			rel.first = diff*diff; rel.second.first=i; rel.second.second=j;
 			vi.push_back(rel);
 		}
 	}
@@ -622,7 +756,7 @@ node_analysis::regular_fit(void) {
 
 	pf 		= cf.mat2par (P, vl);
 
-	std::cout << "INFOINFOINFO>" << c1.length_M() << " " << c2.length_M() << std::endl;
+	std::cout << "INFO_INFO_INFO>" << c1.length_M() << " " << c2.length_M() << std::endl;
 
 	ftyp rmsd	= shape_fit( P, Q, U, t, -1); // THIS NOW WORKS:: NEEDED N4 NORM
 	output_matrix(U);
@@ -630,8 +764,14 @@ node_analysis::regular_fit(void) {
 	output_matrix(iU);
 	apply_fit( pf, iU, it ); 
 
-	for( int i=0 ; i<pf.size() ; i++ )
+	bool overwrite_model=true;
+	for( int i=0 ; i<pf.size() ; i++ ){
 		pf[i].first = "C";
+	}
+
+	if( overwrite_model ) {
+		parents_.second.set_matrix(pf);
+	}
 
 	return pf;
 }
@@ -1559,7 +1699,7 @@ cluster_node0::apply_fragment_trans( particles coords , std::vector<int> p_ndx)
 
 			gmat *U = gsl_matrix_calloc(DIM,DIM);
 			gvec *t = gsl_vector_calloc(DIM);
-			ftyp rmsd = shape_fit( P, Q, U, t, 1 );
+			ftyp rmsd = shape_fit( P, Q, U, t, -1 );
 
 			gsl_matrix_memcpy (U_, U);
 			gsl_vector_memcpy (t_, t);
