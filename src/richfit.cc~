@@ -514,7 +514,7 @@ fitting::kabsch_fit(	gsl_matrix *P, gsl_matrix *Q,			// IN
 		gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, V, 0.0, TMP);
 		gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, W, TMP, 0.0, C);
 	}
-	gsl_matrix_transpose_memcpy(U,C); // ok...
+	gsl_matrix_transpose_memcpy(U,C);
 
 	gsl_blas_dgemv(CblasNoTrans, -1.0, U, p0, 1.0, q0);
 	gsl_vector_memcpy(t,q0); 

@@ -1,4 +1,4 @@
-/*	simple.hh	*/
+/*	gradient.cc	*/
 //C Copyright (C) 2015 Richard Tjörnhammar
 //L
 //L  This library is free software and is distributed under the terms
@@ -38,25 +38,91 @@
 //L  The GNU Lesser General Public can also be obtained by writing to the
 //L  Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
 //L  MA 02111-1307 USA
-#ifndef SIMPLE_H
-#define SIMPLE_H
-namespace richanalysis {
 
-	class simple_ops {
-		public:
-			ftyp square( ftyp x ) { return x*x; }
-			ftyp abs( ftyp x ) { return (x>0)?(x):(-1*x); }
-			std::vector<std::vector<int> > all_permutations(std::vector<int> v);
-	};
+#include "richtypes.h"
+#include "gradient.hh"
+#include <iostream>
+#include <algorithm>
 
-	class coord_format {
-		public:
-			particles	mat2par ( gmat*, gvec*	);
-			// SHOULD IMPLEMENT ONE WICH RETURNS VECTOR OF PARTICLES ORDERED ON NDX (BELOW)
-			particles	par2par ( particles, std::vector<int> , int );
-			particles	app_par ( particles , particles	);
-			particles	truncmat( gmat*	, gvec* , int	);
-			ids		truncIDs( ids	, gvec* , int	);
-	};
+using namespace richanalysis;
+
+void
+gradient::assign_matrices( particles p1, particles p2 ) {
+
+	if(p1.size()<p2.size()){
+		p1.swap(p2);
+	}
+	int N=p1.size(), M=p2.size();
+	// MODEL IS IN p2
+	if(M_) 
+		gsl_matrix_free(M_);
+	M_	= gsl_matrix_alloc(DIM,M);
+	if(D_) 
+		gsl_matrix_free(D_);
+	D_	= gsl_matrix_alloc(DIM,N);
+	if(F_) 
+		gsl_matrix_free(F_);
+	F_	= gsl_matrix_calloc(DIM,M);
+	if(Mmu_) 
+		gsl_matrix_free(Mmu_);
+	Mmu_	= gsl_matrix_calloc(DIM,M); 
+	if(Dmu_) 
+		gsl_matrix_free(Dmu_);
+	Dmu_	= gsl_matrix_calloc(DIM,M);
+	if(Msig_) 
+		gsl_vector_free(Msig_);
+	Msig_	= gsl_vector_calloc(M);
+	if(Dsig_) 
+		gsl_vector_free(Dsig_);
+	Dsig_	= gsl_vector_calloc(M);
+
+	gvec *vt	= gsl_vector_calloc(M);
+	gvec *wt	= gsl_vector_calloc(N); 	// HAS A MU INDEX
+
+	std::vector<double> cnts;
+
+	gvec *r1 = gsl_vector_alloc( DIM );
+	gvec *r2 = gsl_vector_alloc( DIM );
+	for(int i=0;i<M;i++){
+		double min_val=1e10;
+		for(int j=0;j<M;j++){
+			if( i==j )
+				continue;
+			gsl_vector_memcpy(r1,p2[i].second);
+			gsl_vector_memcpy(r2,p2[j].second);
+			gsl_vector_sub(r1,r2);
+			double len = gsl_blas_dnrm2(r1);
+			if( len < min_val ) {
+				min_val=sqrt(len);
+			}
+		}
+		gsl_matrix_set_col(M_,i,p2[i].second);
+		gsl_vector_set(Msig_,i,min_val/2.0);
+		cnts.push_back(0.0);
+	}
+
+	for(int i=0;i<N;i++)
+		gsl_matrix_set_col(D_,i,p1[i].second);
+	gsl_kmeans( D_, wt, Dmu_, vt);
+
+	gsl_vector *r = gsl_vector_calloc(DIM);
+	gsl_vector *p = gsl_vector_calloc(DIM);
+	for(int i=0;i<N;i++) {
+		int j = gsl_vector_get(wt,i);
+		gsl_matrix_get_col(r, Dmu_, j);
+		gsl_matrix_get_col(p, D_, i);
+		gsl_vector_sub	( p, r );
+		double len = gsl_blas_dnrm2( p );
+		double sig = gsl_vector_get( Dsig_ , j );
+		gsl_vector_set(Dsig_,j,sig+len); 
+		cnts[j]+=1.0;
+	}
+	for(int i=0;i<M;i++) {	
+		double sig = gsl_vector_get( Dsig_, i );
+		gsl_vector_set(Dsig_,i,sqrt( sig/cnts[i]) ); 
+	}
+	bSet_ = true;
+
+	gsl_vector_free(vt); gsl_vector_free( r); gsl_vector_free( p);
+	gsl_vector_free(wt); gsl_vector_free(r1); gsl_vector_free(r2);
 }
-#endif

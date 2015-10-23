@@ -1,4 +1,4 @@
-/*	simple.hh	*/
+/*	gradient.hh	*/
 //C Copyright (C) 2015 Richard Tjörnhammar
 //L
 //L  This library is free software and is distributed under the terms
@@ -38,25 +38,29 @@
 //L  The GNU Lesser General Public can also be obtained by writing to the
 //L  Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
 //L  MA 02111-1307 USA
-#ifndef SIMPLE_H
-#define SIMPLE_H
+
+#include "richtypes.h"
+#include "simple.hh"
+#include "iofunc.hh"
+#include "richfit.hh"
+#include "cluster.hh"
+#ifndef GRADIE_H
+#define GRADIE_H
 namespace richanalysis {
 
-	class simple_ops {
-		public:
-			ftyp square( ftyp x ) { return x*x; }
-			ftyp abs( ftyp x ) { return (x>0)?(x):(-1*x); }
-			std::vector<std::vector<int> > all_permutations(std::vector<int> v);
-	};
-
-	class coord_format {
-		public:
-			particles	mat2par ( gmat*, gvec*	);
-			// SHOULD IMPLEMENT ONE WICH RETURNS VECTOR OF PARTICLES ORDERED ON NDX (BELOW)
-			particles	par2par ( particles, std::vector<int> , int );
-			particles	app_par ( particles , particles	);
-			particles	truncmat( gmat*	, gvec* , int	);
-			ids		truncIDs( ids	, gvec* , int	);
+	class gradient : public clustering  {
+		public :
+			gradient		( void	) { bSet_=false; };
+			void assign_matrices	( particles p1, particles p2 );
+			void calc_parameters	( void	);
+			void calc_gradients	( void	);
+			void update_coordinates	( void	);
+		private:
+			bool bSet_;
+			gmat *M_	,	*D_;
+			gmat *Mmu_	,	*Dmu_;
+			gvec *Msig_	,	*Dsig_;
+			gmat *F_; // NOT CONSERVATIVE! ONLY ON M_!	
 	};
 }
 #endif

@@ -1112,3 +1112,446 @@ clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw ){
 	return 0;
 }
 
+std::vector<int>			
+cluster_node0::find_simple_relation( void ){
+	std::vector<std::pair<int,int > > residx;
+	std::vector<int> idx, sidx;
+	std::vector<ftyp > rmsds;
+
+	if(!subSet()) {
+		std::cout << "INFO::SUBNOTSET::" << std::endl;
+		return idx;
+	}
+	int N = vc1_.size();
+	int M = vc2_.size();
+	std::cout << "INFO:: HAVE SUBCLUSTERS OF SIZE::" << N << " AND " << M << std::endl;
+	if(N!=M) {
+		return idx;
+	}
+
+	for(int i=0;i<N;i++) {
+	double rmsd0=100.0;
+	for(int j=0;j<M;j++) {
+		gmat *P = gsl_matrix_calloc(DIM,vc2_[i].length_M());
+		vc2_[i].copyM(P);
+		gmat *Q = gsl_matrix_calloc(DIM,vc1_[j].length_M());
+		vc1_[j].copyM(Q);
+		gmat *U = gsl_matrix_calloc(DIM,DIM);
+		gvec *t = gsl_vector_calloc(DIM);
+
+		ftyp rmsd=shape_fit( P, Q, U, t, 2);
+
+		std::pair<int,int> pi;
+		pi.first=i; pi.second=j;
+		rmsds.push_back(rmsd);
+		residx.push_back(pi);
+	}
+	}
+
+	idx.push_back(-1); idx.push_back(-1); idx.push_back(-1);
+	sidx.push_back(-1); sidx.push_back(-1); sidx.push_back(-1);
+	while( N>0 ) {
+		ftyp rms	= 1E10; int J=0;
+		for(int i=0;i<residx.size();i++){
+			if( rms>rmsds[i] ) {
+				rms=rmsds[i];
+				J	= i;
+			}
+		}
+		rmsds[J]=1E10;
+		if( idx[residx[J].first]==-1 && sidx[residx[J].second]==-1 ){ // 
+			idx[residx[J].first]=residx[J].second;
+			sidx[residx[J].second]=residx[J].first;
+			N--;
+		}
+	}
+	std::cout << "INFO::HAVE::N_IDX::" << idx.size() << std::endl;
+
+	idx_.clear();
+	for(int i=0;i<idx.size();i++){
+		idx_.push_back(idx[i]);
+		std::cout << "INFO:: " << idx[i] << std::endl;
+	}
+	return idx;
+}
+
+void
+cluster_node0::assign_sub( cluster0 c1, cluster0 c2 ) {
+
+	int N,M;
+	if(c1.isSet()&&c2.isSet()){
+		parents_.first  = c1;
+		parents_.second = c2;
+
+		N=c1.length_M();
+		M=c1.length_C();
+		gmat *M1 = gsl_matrix_calloc(DIM,N);
+		gvec *v1 = gsl_vector_calloc(N);
+		c1.copyM(M1); c1.copyv(v1);
+		for( int ipart=0; ipart<M; ipart++ ){
+			richanalysis::coord_format cf;
+			particles px;
+			px	= cf.truncmat(M1,v1,ipart);
+			int D	= px.size();
+			richanalysis::cluster0 clpx;
+			clpx.alloc_space( D, 3 );	// THESE CENTOIDS SHOULD NOT BE USED
+			clpx.set_matrix( px );
+			clpx.perform_clustering();
+			vc1_.push_back(clpx);
+		}
+
+		N=c2.length_M();
+		M=c1.length_C();
+		gmat *M2 = gsl_matrix_calloc(DIM,N);
+		gvec *v2 = gsl_vector_calloc(N);
+		c2.copyM(M2); c2.copyv(v2);
+		for( int ipart=0; ipart<M; ipart++ ){
+			richanalysis::coord_format cf;
+			particles px;
+			px	= cf.truncmat(M2,v2,ipart);
+			int D	= px.size();
+			richanalysis::cluster0 clpx;
+			clpx.alloc_space( D, 3 );	// THESE CENTOIDS SHOULD NOT BE USED
+			clpx.set_matrix( px );
+			clpx.perform_clustering();
+			vc2_.push_back(clpx);
+		}
+		subSet_=1;
+
+	}
+}
+
+particles 
+cluster_node0::apply_rot_trans( particles px , int I){
+
+	particles rpx;
+	for(int i=0;i<px.size();i++){
+		particle p0;
+		p0.first	= px[i].first;
+		p0.second	= gsl_vector_calloc(DIM);
+		gsl_vector_memcpy( p0.second, px[i].second);
+		rpx.push_back( p0 );
+	}
+
+	if(bUtSet_){
+		if(I>=0)
+			apply_fit( rpx,  U_, t_	 );
+		if(I<0)
+			apply_fit( rpx, iU_, it_ );
+	}
+
+	return rpx;
+}
+
+particles 
+cluster_node0::apply_rot_trans( particles px ){
+	particles rpx;
+	for(int i=0;i<px.size();i++){
+		particle p0;
+		p0.first	= px[i].first;
+		p0.second	= gsl_vector_calloc(DIM);
+		gsl_vector_memcpy( p0.second, px[i].second);
+		rpx.push_back( p0 );
+	}
+
+	if(bUtSet_){
+		if(sgn_>=0)
+			apply_fit( rpx,  U_, t_	 );
+		if(sgn_<0)
+			apply_fit( rpx, iU_, it_ );
+	}
+	return rpx;
+}
+
+void
+cluster_node0::invert_transform( void ){
+	if( iU_->size1==U_->size1 && iU_->size2==U_->size2 && t_->size==it_->size){
+		invert_matrix(U_,iU_);
+		gsl_blas_dgemv(CblasNoTrans, -1.0, iU_, t_, 0.0, it_);
+	}
+}
+
+std::vector<int> 
+cluster_node0::find_centroid_relation( void ){
+	ftyp min_rmsd	= 1.0E10;
+
+	cluster0 c1 = parents_.first;
+	cluster0 c2 = parents_.second;
+
+	int N = c1.length_C();
+
+	if( N != c2.length_C())
+		std::cout << "ERROR IN IDX REL" << std::endl;
+
+	gmat *U		= gsl_matrix_calloc( DIM, DIM );
+	gvec *t		= gsl_vector_calloc( DIM );
+
+	int J		= 0;
+
+	gmat *C0T	= gsl_matrix_calloc( DIM, N );
+	gmat *C0N	= gsl_matrix_calloc( DIM, N );
+	gmat *CNT	= gsl_matrix_calloc( DIM, N );
+	gmat *CEN	= gsl_matrix_calloc( DIM, N );
+	gvec *gv 	= gsl_vector_calloc( DIM );
+
+	c1.copyC(C0N);
+	c2.copyC(C0T);
+
+	gmat *Ut = gsl_matrix_calloc( DIM, DIM );
+	gvec *tt = gsl_vector_calloc( DIM );
+
+	std::vector<int> iv;
+	for(int i=0;i<N;i++)
+		iv.push_back(i);
+
+	std::vector<std::vector<int> > imv = all_permutations(iv);
+
+	for(int j=0;j<imv.size();j++){
+		gsl_matrix_memcpy (CEN, C0N);
+		for(int i=0;i<iv.size();i++) {
+			gsl_matrix_get_col (gv, C0T, i);
+			gsl_matrix_set_col (CNT, imv[j][i], gv );
+		}
+		ftyp rmsd = kabsch_fit(CNT,CEN,U,t);
+		if(rmsd<min_rmsd){
+			J=j; 
+			min_rmsd=rmsd;	
+			gsl_matrix_memcpy (Ut, U);
+			gsl_vector_memcpy (tt, t);
+		}
+	}
+
+	if(idx_.size()!=0) {
+		std::cout << "INFO::ERROR WITH IDX_" << std::endl;
+		idx_.clear();
+		iidx_.clear();
+	}
+	for(int i=0;i<iv.size();i++)
+		iidx_.push_back(0);
+
+	for(int i=0;i<iv.size();i++){
+		idx_.push_back(imv[J][i]);
+		iv[i]=imv[J][i];
+		iidx_[imv[J][i]]=i;
+	}
+
+	bDirRel_=2*(c1.length_M()>c2.length_M())-1;
+
+	if(!have_transform())
+	{
+		gsl_matrix_memcpy (U_, Ut);
+		gsl_vector_memcpy (t_, tt);
+		invert_transform();
+		bUtSet_=1;
+		sgn_=1;
+	}
+
+	gsl_matrix_free(CNT);
+	gsl_matrix_free(C0N);
+	gsl_matrix_free(C0T);
+	gsl_matrix_free(U);
+	gsl_vector_free(t);
+	gsl_vector_free(gv);
+
+	return iv;
+}
+
+ftyp
+find_shape(){
+//	Do a single shape fit
+
+	if( isSet() ) { 
+		int N 		= length_M();
+		gmat *MEN	= gsl_matrix_calloc( DIM, N );
+		copyM(MEN);
+	
+		gmat *Utmp	= gsl_matrix_calloc( DIM, DIM );
+		gvec *ttmp	= gsl_vector_calloc( DIM );
+		
+		ftyp min_rmsd 	= shape(MEN,Utmp,ttmp);
+
+		gsl_matrix_memcpy (Uc_, Utmp);
+		gsl_vector_memcpy (tc_, ttmp);
+		bPCset_		=	1;
+
+		gsl_matrix_free(MEN);
+		gsl_matrix_free(Utmp); 
+		gsl_vector_free(ttmp);
+	}
+
+	return 0.0;
+}
+
+ftyp 
+shape(		gmat *P, gmat *U , gvec *t 	) 
+{	
+	if( !(	   P->size1 
+		&& U->size1 == U->size2 && U->size1 == P->size1 
+		&& t->size  == P->size1 && P->size1 <= P->size2 ) )
+		return(-1.0); 		// PROBLEMS WITH THE DIMENSIONS
+
+	int 	L = ((int)P->size2),
+		D = ((int)P->size1);	// MATRIX DIMS
+
+	ftyp wsum = P->size2;
+	if( wsum <= 0.0 ) {
+		return(-2.0); 		// PROBLEMS WITH VALUE
+	}
+
+	gsl_vector *w = gsl_vector_alloc((int)P->size2);
+	gsl_vector_set_all( w , 1.0/wsum );
+	gsl_vector *p0 = gsl_vector_alloc(D);
+
+	calc_centroid(P,w,p0); center_matrix(P,p0);
+	gsl_matrix *wP = gsl_matrix_alloc(P->size1,P->size2);
+	calc_vmprod( w, P, wP );
+
+	gsl_matrix *W	= gsl_matrix_alloc( L, D );
+	gsl_matrix *V   = gsl_matrix_alloc( D, D );
+	gsl_matrix *C   = gsl_matrix_alloc( L, D );
+	gsl_matrix_transpose_memcpy (C, wP);
+	gsl_vector *S	= gsl_vector_alloc( D );
+	gsl_vector *wrk = gsl_vector_alloc( D );
+
+	gsl_matrix *TMP = gsl_matrix_alloc( D, D );
+	gsl_matrix *EYE = gsl_matrix_alloc( D, D );
+
+	gsl_linalg_SV_decomp ( C, V, S, wrk );
+	gsl_matrix_memcpy( W, C );
+
+	output_vector(S);
+
+	gsl_matrix_transpose_memcpy(U,V);
+	gsl_vector_memcpy(t, p0);
+
+	gsl_vector_free(w);
+	gsl_vector_free(p0);	
+	gsl_matrix_free( wP);	
+	gsl_matrix_free( W );	
+	gsl_matrix_free( V );
+	gsl_matrix_free( C );
+	gsl_vector_free( S );	
+	gsl_vector_free(wrk);	
+	gsl_matrix_free(TMP);		
+	gsl_matrix_free(EYE);	
+
+	return 0.0;
+}
+
+particle
+normal( void ){
+	particle par;
+	if( has_shape() ){
+		gmat *Uc1	= gsl_matrix_calloc(DIM,DIM);
+		gvec *tc	= gsl_vector_calloc(DIM);
+		copyUc(Uc1);
+		copytc(tc);
+		gvec *a = gsl_vector_calloc(DIM);
+ 		gsl_matrix_get_row (a, Uc1, ZZ);
+		par.first ="Ag";
+		gsl_vector_add(a,tc);
+		par.second=a;
+		return par;
+	}else{
+		return par;
+	}
+}
+
+particle
+center( void ){
+	if( has_shape() ){
+		gvec *tc	= gsl_vector_calloc(DIM);
+		copytc(tc);
+		particle par;
+		par.first ="Ag";
+		par.second=tc;
+		return par;
+	}
+}
+
+ftyp			
+angle_between(cluster0 c1, cluster0 c2) {
+
+	if( c1.has_shape() && c2.has_shape() ){
+		ftyp a,b,c,x,y,z;
+		gmat *Uc1 = gsl_matrix_calloc(DIM,DIM);
+		c1.copyUc(Uc1);
+		a = gsl_matrix_get(Uc1,XX,ZZ); 
+		b = gsl_matrix_get(Uc1,YY,ZZ); 
+		c = gsl_matrix_get(Uc1,ZZ,ZZ);
+		gmat *Uc2 = gsl_matrix_calloc(DIM,DIM);
+		c2.copyUc(Uc2);
+		x = gsl_matrix_get(Uc2,XX,ZZ); 
+		y = gsl_matrix_get(Uc2,YY,ZZ); 
+		z = gsl_matrix_get(Uc2,ZZ,ZZ);
+
+		gvec *tc1	= gsl_vector_calloc(DIM);
+		c1.copytc(tc1);
+		gvec *tc2	= gsl_vector_calloc(DIM);
+		c2.copytc(tc2);
+		gsl_vector_sub(tc2,tc1);
+
+		ftyp dx = gsl_vector_get(tc2,XX);
+		ftyp dy = gsl_vector_get(tc2,YY);
+		ftyp dz = gsl_vector_get(tc2,ZZ);
+
+		ftyp dlen0=1.0/sqrt(dx*dx+dy*dy+dz*dz);
+		ftyp ilen1=1.0/sqrt(a*a+b*b+c*c);
+		ftyp ilen2=1.0/sqrt(x*x+y*y+z*z);
+
+		ftyp angle=atan2( (dx*(b*z-c*y)+dy*(c*x-a*z)+dz*(a*y-b*x))*dlen0*ilen1*ilen2 , (a*x+b*y+c*z)*ilen1*ilen2 );
+
+		gsl_matrix_free(Uc1); gsl_matrix_free(Uc2);
+		std::cout << "INFO::TORSION  " << angle*180/M_PI << std::endl;
+		return angle;
+	}else{
+		return -1000.0;
+	}
+}
+
+
+std::pair<ftyp,ftyp >			
+angle_between(cluster0 c1, cluster0 c2, int I, int J){
+
+	std::pair<ftyp,ftyp > ang_dist;
+
+	if( c1.has_shape() && c2.has_shape() ){
+		ftyp a,b,c,x,y,z;
+		gmat *Uc1 = gsl_matrix_calloc(DIM,DIM);
+		gmat *Uc2 = gsl_matrix_calloc(DIM,DIM);
+		gvec *tc1 = gsl_vector_calloc(DIM);
+		gvec *tc2 = gsl_vector_calloc(DIM);
+		c1.copyUc(Uc1);
+		c2.copyUc(Uc2);
+		c1.copytc(tc1);
+		c2.copytc(tc2);
+		gsl_vector_sub(tc1,tc2);
+		{ 
+			a = gsl_matrix_get(Uc1,XX,ZZ); 
+			b = gsl_matrix_get(Uc1,YY,ZZ); 
+			c = gsl_matrix_get(Uc1,ZZ,ZZ);
+
+			x = gsl_matrix_get(Uc2,XX,ZZ); 
+			y = gsl_matrix_get(Uc2,YY,ZZ); 
+			z = gsl_matrix_get(Uc2,ZZ,ZZ);
+
+			ftyp dx = gsl_vector_get(tc1,XX);
+			ftyp dy = gsl_vector_get(tc1,YY);
+			ftyp dz = gsl_vector_get(tc1,ZZ);
+
+			ftyp dlen0=1.0/sqrt(dx*dx+dy*dy+dz*dz);
+			ftyp ilen1=1.0/sqrt(a*a+b*b+c*c);
+			ftyp ilen2=1.0/sqrt(x*x+y*y+z*z);
+
+			ftyp angle	= atan2( (dx*(b*z-c*y)+dy*(c*x-a*z)+dz*(a*y-b*x))*dlen0*ilen1*ilen2 , (a*x+b*y+c*z)*ilen1*ilen2 );
+			ang_dist.first	= angle*180.0/M_PI;
+			ang_dist.second	= 1.0/dlen0;
+		}
+		gsl_vector_free(tc1); gsl_vector_free(tc2);
+		gsl_matrix_free(Uc1); gsl_matrix_free(Uc2);
+	}else{
+		ang_dist.first=0.0; ang_dist.second=-1.0;
+	}
+	return ang_dist;
+}
+
