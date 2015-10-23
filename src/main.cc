@@ -42,6 +42,7 @@
 #include "richfit.hh"
 #include "iofunc.hh"
 #include "cluster.hh"
+#include "gradient.hh"
 
 int main (int argc, char **argv) {
 
@@ -180,101 +181,17 @@ int main (int argc, char **argv) {
 			}
 		}
 	}
-
 	richanalysis::layer_analysis	alayer(solved_layer);
 
 	std::cout << "::ALTERNATIVE::" << std::endl;
-	n0.first.set_cDIM(3);
-	n0.second.set_cDIM(3);
 	n0.first.find_centroids();
 	n0.second.find_centroids();
 	richanalysis::node_analysis nnode(n0);
 //	
 	particles c_aligned = nnode.regular_fit();		// shape fit
-	particles cc_aligned = nnode.centroid_frag_fit();	// alleviates permutation operation
 	for( int i=0 ; i<c_aligned.size() ; i++ )
 		c_aligned[i].first = carth_space[i].first;
-	for( int i=0 ; i<cc_aligned.size() ; i++ )
-		cc_aligned[i].first = carth_space[i].first;
-	fIO.output_pdb("test-ccn" + ns + ".pdb", cc_aligned );
 	fIO.output_pdb("test-can" + ns + ".pdb",  c_aligned );
-
-//// ALTERNATIVE
-	richanalysis::node	n1;
-	if( D >= B ) {
-		n1.first.set_matrix (	coord_space	);
-		n1.second.set_matrix(	c_aligned	);
-	} else {
-		n1.second.set_matrix(	coord_space	);
-		n1.first.set_matrix (	c_aligned	);
-	}
-	richanalysis::node_analysis new_node(	n1	);	
-	std::cout << "::SEEDED KMEANS::" << std::endl;
-
-//	DONE AFTER RIGID FIT
-//	particles s_aligned = new_node.seeded_centroids();
-//	for( int i=0 ; i<s_aligned.size() ; i++ ) {
-//		s_aligned[i].first = carth_space[i].first;
-//		gsl_vector_add(s_aligned[i].second,c_aligned[i].second);
-//		gsl_vector_scale(s_aligned[i].second,0.5);
-//	}
-//	fIO.output_pdb("test-n" + ns + ".pdb", s_aligned );
-
-	std::cout << "::ALTERNATIVE::" << std::endl;
-	richanalysis::particle_analysis pa;
-//	pa.assign_particles(coord_space, carth_space);
-	pa.assign_particles( coord_space, c_aligned  );
-	std::vector<int> ridx=pa.return_idx();
-	gmat *CM = gsl_matrix_calloc(DIM,B);
-	gvec *cv = gsl_vector_calloc(DIM);
-	pa.copyC(CM);
-//working here
-//	for(int i=0;i<ridx.size();i++) {
-//		gsl_matrix_get_col(cv,CM,ridx[i]);
-//		gsl_vector_memcpy(c_aligned[i].second,cv);
-		//gsl_vector_scale(c_aligned[i].second,0.5);
-//	}
-	fIO.output_pdb("test-n" + ns + ".pdb", c_aligned );	
-
-	std::vector< std::pair<ftyp, std::pair< int, int > > > atomlist = pa.compare_dist_matrices(2.0);
-	std::cout << "INFO::"  << atomlist.size() << std::endl;
-
-	int imax=0;
-	for(int i=0 ; i< atomlist.size() ; i++ ){
-		imax = ( atomlist[i].second.first )>(imax)?( atomlist[i].second.first ):(imax);
-		imax = ( atomlist[i].second.second)>(imax)?( atomlist[i].second.second):(imax);
-	}
-
-	std::cout << "INFO::LARGEST::INDEX::" << imax+1 << std::endl;
-	int i1,i2;
-	std::vector<int> vi1, vi2, vi_fin;
-
-	for( int i=0 ; i<B ; i++ ) {
-		vi1.push_back(1);
-		vi2.push_back(1);
-		vi_fin.push_back(-1);
-	}
-	for( int i=0 ; i<atomlist.size() ; i++ ) {
-		i1 = atomlist[i].second.first ;
-		i2 = atomlist[i].second.second;
-		if( vi_fin[i1] < 0 && vi2[i2] ) {
-			vi_fin[i1]	= i2;
-			vi2[i2]		=  0;
-			vi1[i1]		=  0;
-			imax--;
-		}
-	}
-	std::cout << "INFO::HAVE::RELATION::" << std::endl;
-	for( int i=0 ; i<B ; i++ ) 
-		std::cout << " " << vi_fin[i]  << std::endl;
-	std::cout << std::endl;
-
-	std::cout << "INFO" << clu_ndx.size() << std::endl;
-	for( int i = 0 ; i < clu_ndx.size() ; i++ )
-		std::cout << " " <<  clu_ndx[i] ;
-	std::cout << std::endl;
-
-	pa.output_result("pastuff.pdb");
 
 	return 0;
 }

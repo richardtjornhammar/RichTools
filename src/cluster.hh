@@ -43,7 +43,8 @@
 #include "simple.hh"
 #include "iofunc.hh"
 #include "richfit.hh"
-
+#ifndef CLUSTER_H
+#define CLUSTER_H
 namespace richanalysis {
 
 	class clustering : public simple_ops , public tensorIO  {
@@ -213,5 +214,5 @@ namespace richanalysis {
 			gvec	*wc_;		// 1 UNSORTED LABELS
 			std::vector< std::pair<ftyp, std::pair< int, int > > > relation_;
 	};
-
 }
+#endif

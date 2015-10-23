@@ -52,28 +52,16 @@ gradient::assign_matrices( particles p1, particles p2 ) {
 	if(p1.size()<p2.size()){
 		p1.swap(p2);
 	}
+	model_.clear();
 	int N=p1.size(), M=p2.size();
 	// MODEL IS IN p2
-	if(M_) 
-		gsl_matrix_free(M_);
+	N_	= gsl_matrix_calloc(DIM,N);
 	M_	= gsl_matrix_alloc(DIM,M);
-	if(D_) 
-		gsl_matrix_free(D_);
 	D_	= gsl_matrix_alloc(DIM,N);
-	if(F_) 
-		gsl_matrix_free(F_);
 	F_	= gsl_matrix_calloc(DIM,M);
-	if(Mmu_) 
-		gsl_matrix_free(Mmu_);
 	Mmu_	= gsl_matrix_calloc(DIM,M); 
-	if(Dmu_) 
-		gsl_matrix_free(Dmu_);
 	Dmu_	= gsl_matrix_calloc(DIM,M);
-	if(Msig_) 
-		gsl_vector_free(Msig_);
 	Msig_	= gsl_vector_calloc(M);
-	if(Dsig_) 
-		gsl_vector_free(Dsig_);
 	Dsig_	= gsl_vector_calloc(M);
 
 	gvec *vt	= gsl_vector_calloc(M);
@@ -96,8 +84,9 @@ gradient::assign_matrices( particles p1, particles p2 ) {
 				min_val=sqrt(len);
 			}
 		}
+		model_.push_back( p2[i] );
 		gsl_matrix_set_col(M_,i,p2[i].second);
-		gsl_vector_set(Msig_,i,min_val/2.0);
+		gsl_vector_set(Msig_,i,min_val/3.0);
 		cnts.push_back(0.0);
 	}
 
@@ -114,13 +103,14 @@ gradient::assign_matrices( particles p1, particles p2 ) {
 		gsl_vector_sub	( p, r );
 		double len = gsl_blas_dnrm2( p );
 		double sig = gsl_vector_get( Dsig_ , j );
-		gsl_vector_set(Dsig_,j,sig+len); 
+		gsl_vector_set(Dsig_, j, sig+len); 
 		cnts[j]+=1.0;
 	}
 	for(int i=0;i<M;i++) {	
 		double sig = gsl_vector_get( Dsig_, i );
 		gsl_vector_set(Dsig_,i,sqrt( sig/cnts[i]) ); 
 	}
+ 	srand (time(NULL));
 	bSet_ = true;
 
 //	OUTPUT
@@ -131,4 +121,122 @@ gradient::assign_matrices( particles p1, particles p2 ) {
 	}
 	gsl_vector_free(vt); gsl_vector_free( r); gsl_vector_free( p);
 	gsl_vector_free(wt); gsl_vector_free(r1); gsl_vector_free(r2);
+}
+
+ftyp
+gradient::energy( gvec *v , gvec *m, ftyp s, ftyp pfac ) {
+	ftyp E = 0.0;
+
+	if( v->size == 3 ) {
+		gsl_vector *r = gsl_vector_alloc(DIM);
+		gsl_vector_memcpy	( r, v );
+		gsl_vector_sub		( r, m );
+		double len = gsl_blas_dnrm2( r )/s/s;
+		E = pfac*1.0/sqrt(2.0*M_PI)/s*exp(-0.5*len);
+		gsl_vector_free(r);
+	}
+
+	return E;
+}
+
+void
+gradient::force( gvec *v , gvec *f, gvec *m, ftyp s, ftyp pfac ) {
+
+	if( v->size == 3 &&  f->size == 3 ) {
+		gsl_vector *r = gsl_vector_alloc(DIM);
+		gsl_vector_memcpy	( r , v );
+		gsl_vector_memcpy	( f , v	);
+		gsl_vector_sub		( r , m );
+		double len 	= gsl_blas_dnrm2( r )/s/s;
+		double scale 	= pfac*1.0/sqrt(2.0*M_PI)/s/s/s*exp(-0.5*len);
+		gsl_vector_scale	( f , scale	);
+		gsl_vector_free		( r		);		
+	}
+}
+
+void
+gradient::wigner( gvec *w ) { 
+	for(int i=0; i<w->size; i++ ) 
+		gsl_vector_set(w,i, frand()+frand()+frand()+frand()+frand()+frand() - 3.0 );
+}
+
+void
+gradient::update_coordinates( int type ) {
+	ftyp dmax=1.0;
+	if( bSet_ ) {
+
+		gvec *f 	=	gsl_vector_alloc (DIM);
+		gvec *r1	=	gsl_vector_alloc (DIM);
+		gvec *r2	=	gsl_vector_alloc (DIM);
+		gvec *fc	=	gsl_vector_alloc (DIM);
+		gvec *w 	=	gsl_vector_alloc (DIM);
+		gvec *zero	=	gsl_vector_calloc(DIM);
+
+		for(int i=0;i<M_->size2;i++){ 
+
+			for(int j=i+1;j<M_->size2;j++){ // MODEL SELF REPULSION
+				gsl_vector_set_all( f , 0.0 );
+				gsl_matrix_get_col( r1, M_, i );
+				gsl_matrix_get_col( r2, M_, j );
+				double sig = sqrt(gsl_vector_get(Msig_,i)*gsl_vector_get(Msig_,j));
+				gsl_vector_sub(r1,r2);
+
+				force( r1 , f, zero, sig,  1.0  );	// use the force luke!
+				gsl_matrix_get_col( fc, F_ , i  );
+				gsl_vector_add( fc, f );
+				gsl_matrix_set_col( F_, i , fc  );
+
+				gsl_vector_scale(f,-1.0);
+				gsl_matrix_get_col( fc, F_, j   );
+				gsl_vector_add( fc, f );
+				gsl_matrix_set_col( F_, j , fc );
+			}
+
+			for(int j=0;j<Dmu_->size2;j++) { 	// MODEL-DENSITY ATTRACTION
+				gsl_vector_set_all( f , 0.0 );
+				gsl_matrix_get_col( r1,  M_  , i );
+				gsl_matrix_get_col( r2,  Dmu_, j );
+				double sig = gsl_vector_get(Dsig_,j);
+				gsl_vector_sub(r1,r2);
+
+				force( r1 , f, zero, sig, -1.0  );	// use the force luke!
+				gsl_matrix_get_col( fc, F_ , i   );
+				gsl_vector_add( fc, f );
+				gsl_matrix_set_col( F_, i  , fc );	// THIS IS NOT CONSERVATIVE
+			}
+		}
+
+		for( int i=0 ; i<M_->size2 ; i++ ) { 
+			gsl_matrix_get_col( fc, F_ , i   );
+			gsl_matrix_get_col( r1, M_, i );
+			ftyp len 	= sqrt( gsl_blas_dnrm2( fc ) );
+			if( len > 1.0 )	{
+				std::cout << "INFONORM::" << len << std::endl; 	
+				gsl_vector_scale(fc, 1.0/len/len);
+			}
+			gsl_vector_add(fc,r1);
+			gsl_matrix_set_col( M_ , i , fc );
+		}
+		// HERE WE HAVE A GRADIENT (APPLY ROOF AND UPDATE)
+
+		gsl_vector_free( f	);
+		gsl_vector_free( r1	);
+		gsl_vector_free( r2	); 
+		gsl_vector_free( zero	);
+		gsl_vector_free( w	);
+	} else {
+		std::cout << "ERROR IN GRADIENT UPDATE ROUTINE" << std::endl;
+	}
+}
+
+particles
+gradient::get_result(void){
+	if(bSet_){
+		gsl_vector *r = gsl_vector_alloc( DIM );
+		for( int i=0 ; i<M_->size2 ; i++ ){
+			gsl_matrix_get_col( r, M_, i  );
+			gsl_vector_memcpy(model_[i].second,r);
+		}
+	}
+	return model_;	
 }

@@ -50,13 +50,19 @@ namespace richanalysis {
 
 	class gradient : public clustering  {
 		public :
-			gradient		( void	) { bSet_=false; };
-			void assign_matrices	( particles p1, particles p2 );
-			void calc_parameters	( void	);
-			void calc_gradients	( void	);
-			void update_coordinates	( void	);
+			gradient		( void	) { bSet_ = false; E_[0]=0.0; E_[1]=0.0; };
+			void assign_matrices	( particles p1 , particles p2 );
+			void update_coordinates	( int	);
+			void wigner		( gvec *w );
+			ftyp energy		( gvec *v ,		gvec *m, ftyp s, ftyp pfac ); 
+			void force		( gvec *v , gvec *f,	gvec *m, ftyp s, ftyp pfac );
+			ftyp frand		( void ) { return rand()/((ftyp)RAND_MAX); };	
+			particles get_result	(void);
 		private:
 			bool bSet_;
+			particles model_;
+			ftyp  E_[2];
+			gmat *N_;
 			gmat *M_	,	*D_;
 			gmat *Mmu_	,	*Dmu_;
 			gvec *Msig_	,	*Dsig_;
