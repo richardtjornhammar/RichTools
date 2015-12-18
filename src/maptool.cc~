@@ -900,9 +900,9 @@ int main (int argc, char **argv) {
 ////	DO FFT
 	if(verbose)
 		std::cout << "FFT :: BEGUN" << std::endl;
-	xmap.fft_from( fphidata );	
+//	xmap.fft_from( fphidata );	
 //	xmap_p = patterson( fphidata );		 
-//	xmap_p = bijvoet_diff( fphidata );
+	xmap_p = bijvoet_diff( fphidata );
 	if(verbose)                  			 			// GET ERROR FROM CLIPPER
 		std::cout << "FFT :: ENDED" << std::endl;
 
