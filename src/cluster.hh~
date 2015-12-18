@@ -183,7 +183,6 @@ namespace richanalysis {
 			std::vector< std::pair<ftyp, std::pair< int, int > > >	compare_dist_matrices(ftyp val) { 
 						 return compare_dist_matrices(A_, B_, val); };
 			void		assign_via_distmatrix( gmat *A );
-			void		assign_via_distmatrix( gmat *A , gvec *b);
 			void		assign_particles( particles pd, particles pm )	{
 				if( pd.size() > pm.size() ) {
 					density_.clear(); density_.insert( density_.end() , pd.begin() , pd.end() );
