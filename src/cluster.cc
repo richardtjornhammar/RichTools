@@ -71,7 +71,7 @@ bool particle_sort_func(std::pair<ftyp, std::pair< int, int > > i1,std::pair<fty
 };
 
 void
-particle_analysis::assign_via_distmatrix( gmat *A , gvec *b) {
+particle_analysis::assign_via_distmatrix( gmat *A , gvec *b ) {
 
 	int dspace=DIM;
 	if( !complete() && !single() && (b->size==A->size1) )
