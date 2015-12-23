@@ -394,8 +394,8 @@ cluster::alloc_space( int D1, int D2 ) {
 //D2	CENTROID	SPACE
 	// std::cout << "ALLOC:: " << D1 << " " << D2 << std::endl;
 	if( D1 > 0 && D2 > 0 ) {
-		M_	= gsl_matrix_calloc( DIM, D1 );	// MODEL
-		C_	= gsl_matrix_calloc( DIM, D2 );	// DATA
+		M_	= gsl_matrix_calloc( DIM, D1 );	
+		C_	= gsl_matrix_calloc( DIM, D2 );	 
 		vc_	= gsl_vector_calloc( D1 );
 		wc_	= gsl_vector_calloc( D2 );
 		bSet_   = true;
@@ -420,7 +420,7 @@ cluster::set_matrix( particles coord_space ) {
 		// std::cout << "INFO::ASSIGNING::COORDS "<< D <<" "<<rD<<std::endl;
 		id inInfo;
 		idlabels_.clear();
-		for(int i=0;i<D; i++) {
+		for(int i=0;i<D; i++)	{
 			inInfo.first	= i;
 			inInfo.second	= coord_space[i].first;
 			idlabels_.push_back ( inInfo );

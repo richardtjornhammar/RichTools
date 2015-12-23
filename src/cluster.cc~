@@ -71,7 +71,7 @@ bool particle_sort_func(std::pair<ftyp, std::pair< int, int > > i1,std::pair<fty
 };
 
 void
-particle_analysis::assign_via_distmatrix( gmat *A , gvec *b) {
+particle_analysis::assign_via_distmatrix( gmat *A , gvec *b ) {
 
 	int dspace=DIM;
 	if( !complete() && !single() && (b->size==A->size1) )
@@ -394,8 +394,8 @@ cluster::alloc_space( int D1, int D2 ) {
 //D2	CENTROID	SPACE
 	// std::cout << "ALLOC:: " << D1 << " " << D2 << std::endl;
 	if( D1 > 0 && D2 > 0 ) {
-		M_	= gsl_matrix_calloc( DIM, D1 );	// MODEL
-		C_	= gsl_matrix_calloc( DIM, D2 );	// DATA
+		M_	= gsl_matrix_calloc( DIM, D1 );	
+		C_	= gsl_matrix_calloc( DIM, D2 );	 
 		vc_	= gsl_vector_calloc( D1 );
 		wc_	= gsl_vector_calloc( D2 );
 		bSet_   = true;
