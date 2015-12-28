@@ -219,8 +219,8 @@ int main (int argc, char **argv) {
 	gsl_vector *cid		= gsl_vector_calloc( NN );
 	gsl_vector *rho2	= gsl_vector_calloc( NN );
 
-	cl4dg.copyC(pos_c); // centroids
-	cl4dg.copyM(pos_d); // clustered
+	cl4dg.copyC(pos_c);		//	centroids	
+	cl4dg.copyM(pos_d);		//	clustered	
  	cl4dg.copyv(cid);
 
   	for (int j = 0; j < NN; j++)
@@ -253,23 +253,41 @@ int main (int argc, char **argv) {
 
 	double tbond=1.5;
 	tbond*=tbond;
-	double tprox=0.6;
+	double tprox=0.9;
 	tprox*=tprox;
 
 	for(int i=0;i<MM; i++){
 		double b = gsl_vector_get(sig,i);
+		b*=0.1;
 		for(int j=0;j<MM;j++){
 			gsl_matrix_get_col(r1,pos_c,i);
 			gsl_matrix_get_col(r2,pos_c,j);
 			gsl_vector_sub(r1,r2);
 			ftyp len = gsl_blas_dnrm2(r1);
-			len	 = len<tbond?tbond:len;
+			len	*= len;
+			//len	 = len<tbond?tbond:len;
 			len	+= (i>j)?(len+b):(len-b);
-			len	 = len<0?tprox:len;
 			gsl_matrix_set( DISTM, i, j, len );
 		}
-	}	
+	}
 
+	particles new_parts;
+	richanalysis::particle_analysis single_reduction;
+	new_parts = single_reduction.assign_via_distmatrix(DISTM);
+
+	if( D > B ) 
+	{
+		for(int i=0;i<MM;i++)
+			new_parts[i].first[0] = carth_space[i].first[0];
+	}
+	else
+	{
+		for(int i=0;i<MM;i++)
+			new_parts[i].first[0] = coord_space[i].first[0];
+	}
+
+	richanalysis::fileIO fio;
+	fio.output_geometry( new_parts, "new_parts.xyz");
 
 	return 0;
 }

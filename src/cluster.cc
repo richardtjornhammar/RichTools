@@ -70,10 +70,92 @@ bool particle_sort_func(std::pair<ftyp, std::pair< int, int > > i1,std::pair<fty
 	return (i1.first<i2.first);
 };
 
-void
+
+particles
+particle_analysis::assign_via_distmatrix( gmat *A ) {
+
+	int dspace	= DIM;
+	int N		= A->size1;
+	gsl_matrix *X	= gsl_matrix_calloc( N , dspace );
+	gsl_matrix *Y	= gsl_matrix_calloc( dspace, N );
+	gsl_vector *b   = gsl_vector_calloc( N );
+	gsl_vector_set_all( b , 1.0 );
+
+	if( !complete() && !single() && (b->size==A->size1) )
+	{
+		if(A->size1!=A->size2) {
+			std::cout << "INFO::ERROR::DIMENSIONS" << std::endl;
+		}
+
+		A_	= gsl_matrix_calloc( A->size1 , A->size2 );
+		gsl_matrix_memcpy( A_ , A );
+		B_	= gsl_matrix_calloc( A->size1 , A->size2 );
+		gsl_matrix_memcpy( B_ , A );
+
+		gsl_matrix *D	= gsl_matrix_calloc( N , N );
+		gsl_matrix_memcpy( D  , A );
+
+		for(int i=0;i<N;i++)
+		{
+			for(int j=0;j<N;j++)
+			{
+				double dij	= gsl_matrix_get(D,i,j);
+				double dNj	= gsl_matrix_get(D,N-1,j);
+				double diN	= gsl_matrix_get(D,i,N-1);
+				double nDij	= (diN+dNj-dij)*0.5;
+				gsl_matrix_set ( D, i, j , nDij );
+			}
+		}
+
+		gsl_matrix *U	= gsl_matrix_alloc( N, N );
+		gsl_matrix *V	= gsl_matrix_alloc( N, N );
+		gsl_vector *S	= gsl_vector_alloc( N );
+		gsl_vector *wrk = gsl_vector_alloc( N );
+		gsl_linalg_SV_decomp ( D, V, S, wrk ); 		
+		gsl_matrix_memcpy(  U, D );
+	
+		gsl_matrix *E	= gsl_matrix_calloc( N, dspace );
+		for(int i=0;i<dspace;i++)
+			gsl_matrix_set( E, i, i, sqrt(gsl_vector_get(S,i)) );
+
+		gsl_blas_dgemm (CblasNoTrans, CblasNoTrans,
+				1.0, U, E, 0.0, X );
+
+		C_	= gsl_matrix_calloc( dspace, N );
+		vc_	= gsl_vector_calloc( N );
+		gsl_vector_set_all( vc_ ,  1.0 );
+
+		M_	= gsl_matrix_calloc( dspace, N );
+		wc_	= gsl_vector_calloc( N );
+		gsl_vector_set_all( wc_ ,  1.0 );
+
+		gsl_matrix_transpose_memcpy( C_, X );
+		gsl_matrix_transpose_memcpy( M_, X );
+
+		bSingleSet_ = true;
+	}
+	else 
+	{
+		std::cout << "INFO::ERROR::ALREADY::COMPLETED" << std::endl;
+	}
+	gsl_matrix_transpose_memcpy( Y, X );
+	std::cout << "INFO::HAVE" << X->size1 << " AND " << X->size2 << std::endl;
+	richanalysis::coord_format cfp;
+	particles red_parts = cfp.mat2par( Y , b );
+	std::cout << "INFO::HAVE" << red_parts.size() << std::endl;
+
+	return red_parts;
+
+}
+
+
+particles
 particle_analysis::assign_via_distmatrix( gmat *A , gvec *b ) {
 
-	int dspace=DIM;
+	int dspace	= DIM;
+	int N		= A->size1;
+	gsl_matrix *X	= gsl_matrix_calloc( N , dspace );
+
 	if( !complete() && !single() && (b->size==A->size1) )
 	{
 		int N	= A->size1;
@@ -88,10 +170,6 @@ particle_analysis::assign_via_distmatrix( gmat *A , gvec *b ) {
 
 		gsl_matrix *D	= gsl_matrix_calloc( N , N );
 		gsl_matrix_memcpy( D  , A );
-		gsl_matrix *X	= gsl_matrix_calloc( N , dspace );
-
-//		gsl_vector *b   = gsl_vector_calloc( N );
-//		gsl_vector_set_all( b , 1.0 );
 
 		// ZERO CHECKING NOT IN ORIGINAL ALGORITHM
 		for(int i=0;i<N;i++)
@@ -116,8 +194,8 @@ particle_analysis::assign_via_distmatrix( gmat *A , gvec *b ) {
 			for(int j=0;j<N;j++)
 			{
 				double dij	= gsl_matrix_get(D,i,j);
-				double dNj	= gsl_matrix_get(D,N,j);
-				double diN	= gsl_matrix_get(D,i,N);
+				double dNj	= gsl_matrix_get(D,N-1,j);
+				double diN	= gsl_matrix_get(D,i,N-1);
 				double nDij	= (diN+dNj-dij)*0.5;
 				gsl_matrix_set ( D, i, j , nDij );
 			}
@@ -154,6 +232,11 @@ particle_analysis::assign_via_distmatrix( gmat *A , gvec *b ) {
 	{
 		std::cout << "INFO::ERROR::ALREADY::COMPLETED" << std::endl;
 	}
+
+	richanalysis::coord_format cfp;
+	particles red_parts = cfp.mat2par( X , b );
+	return red_parts;
+
 }
 
 void
