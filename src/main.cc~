@@ -45,57 +45,106 @@
 #include "gradient.hh"
 
 int main (int argc, char **argv) {
+//
+//	ARG PARSING INIT
+//
+	std::string			progname("richtool");
+	std::string			author("\nRichard Tjörnhammar \nEmail: richard.tjornhammar@gmail.com\n");
+	std::vector< std::pair< std::string, std::string > > opts;
+	std::vector< std::string >	args;
+	if( argc < 2 ) {
+		args.push_back(argv[0]);
+		args.push_back("-h");
+	} else {
+		for( int i=0 ; i<argc ; i++ )
+			args.push_back(argv[i]);
+	}
+	std::pair< std::string , std::string > poop;
+	poop.first = "-iden";
+	opts.push_back(poop);
+	poop.first = "-imod";
+	opts.push_back(poop);
+	poop.first = "-omod";
+	opts.push_back(poop);
+	poop.first = "-oclu";
+	opts.push_back(poop);
 
-	std::string 	filename[2];
-	std::string 	ext("xyz");
-	std::ifstream 	inp_molecule;
-	int verbose	= 0;
-
-	richanalysis::fileIO fIO;
-	particles coord_space, carth_space;
-	int N		= 3;
-	bool bFit	= true;
-
-	switch( argc ) {
-		case 3: {
-			        std::string tmpline( argv[2] );
-				filename[1] = tmpline;
-                                std::size_t found = tmpline.find(ext);
-                                if ( found != std::string::npos ){
-                                        std::cout << "INFO:: FOUND XYZ INPUT NAME = " << filename[1] << std::endl;
-                                        carth_space = fIO.read_xyz(filename[1]);
-                                        std::cout << "INFO:: DONE READING MODEL" << std::endl;
-					if( carth_space.size() <= 0 ) {
-						std::cout << "FATAL:: FAILED TO GET COORDINATES" << std::endl;
-						return(1);
-					}
-                                }
+	std::vector<std::string> 	iv_ext;
+	iv_ext.push_back("xyz");
+	std::vector<std::string> 	ov_ext;
+	ov_ext.push_back("xyz");
+	ov_ext.push_back("pdb");
+//
+//	ARG PARSE
+//
+	int arg = 0;
+	int failed = 0;
+//
+	while ( ++arg < args.size()  ) {
+		if	( args[arg] == "-h" ||  args[arg] =="--h" || args[arg] =="--help" || args[arg] =="-help") {
+			std::cout << "Usage: " << progname << "\n\t";
+			for( int opt=0 ; opt<opts.size() ; opt++ ){
+				std::cout << opts[opt].first << " \t [string] " << "\n\t";
 			}
-		case 2: {
-				std::string tmpline( argv[1] );
-				filename[0] = tmpline;
-				std::size_t found = tmpline.find(ext);
-				if (found!=std::string::npos){
-					std::cout << "INFO:: FOUND XYZ INPUT NAME = " << filename[0] << std::endl;
-					coord_space = fIO.read_xyz(filename[0]);
-					std::cout << "INFO:: DONE READING DENSITY" << std::endl;
-					if(coord_space.size()<=0){
-						std::cout << "FATAL:: FAILED TO GET COORDINATES" << std::endl;
-						return(1);
-					}
+			std::cout << "-h" << "\n\t" << "--h" << "\n\t"<< "--help" << "\n\t"<< "-help" << "\n\n";
+			std::cout << "Please contact" << author << "with any questions, comments or problems\n";
+			failed = 2;
+			break;
+		} else {
+			int ia0=arg, ia=++arg;
+			for( int opt=0; opt<opts.size(); opt++ ) {
+				if ( args[ia0] == opts[opt].first ) {
+					if ( ia < args.size()  && !(args[ia][0]=='-') )
+						opts[opt].second = args[ia];
+					else 
+						failed = 1;
+					break;
 				}
 			}
-			break;
-		default:
-			std::cout << "FATAL:: FAILED TO OPEN FILE" << std::endl;
-			return(1);
+			if( failed == 1 )
+				break;
+		}
 	}
-
+	if(failed) {
+		if(failed==1)
+			std::cout << "Unrecognized:\t" << args[arg] << "\n";
+		args.clear();
+		return 0;
+	}
+//
+//	ARG INIT
+//
+	richanalysis::fileIO fIO;
+	particles vparts[2];
+	int L[2]={0,0};
+	for(int i=0;i<2;i++) {
+		std::string tmpline( opts[i].second );
+                std::size_t found = tmpline.find(iv_ext[0]);
+		if ( found != std::string::npos ) {
+                	std::cout << "INFO:: FOUND VALID INPUT:: \t "	<< opts[i].first 
+				<< " :: " << opts[i].second << std::endl;
+               		particles p_space = fIO.read_xyz(opts[i].second);
+                        std::cout << "INFO:: DONE READING COORDINATES" << std::endl ;
+			L[i] = (int)p_space.size();
+			if( p_space.size() <= 0 ) {
+				std::cout << "FATAL:: FAILED TO GET COORDINATES" << std::endl;
+				return(1);
+			}
+			vparts[i].swap(p_space);
+		}else{
+			std::cout << "FATAL:: FAILED" << std::endl;
+			std::cout << "FATAL:: " <<  opts[i].first << " AND " << opts[i].second << std::endl;
+			return(1);
+		}
+	}
+//	
+//	PROGRAM INIT
+//
+	int verbose	= 0;
+	int N		= 3;
+	bool bFit	= true;
 	std::string ns	= std::to_string(N);
-
-	int D		= coord_space.size();
-	int B		= carth_space.size();
-
+//
 ////DEBUG SECTION:: SINGLE PASS
 /*
 	richanalysis::node	n0;
@@ -120,21 +169,21 @@ int main (int argc, char **argv) {
 	richanalysis::layer	old_layer;
 	richanalysis::layer	solved_layer;
 	richanalysis::node	n0;
-	if( D>=B ){
-		n0.first.set_matrix(coord_space);
-		n0.second.set_matrix(carth_space);
+
+	if( L[0] >= L[1] ) {
+		n0.first.set_matrix(  vparts[0] );
+		n0.second.set_matrix( vparts[1] ); 
 	}else{
-		n0.second.set_matrix(coord_space);
-		n0.first.set_matrix(carth_space);
+		n0.first.set_matrix(  vparts[1] );
+		n0.second.set_matrix( vparts[0] );
 	}
 
-	int sw = (B>=D) + 1;
+	int sw = (L[1]>=L[0]) + 1;
 	old_layer.push_back(n0);
-
 	int C = 1;
-
+/*
 	std::vector<int> clu_ndx,cen_ndx;
-	while ( solved_layer.size() != carth_space.size() )
+	while ( solved_layer.size() !=  vparts[1].size() )
 	{
 		richanalysis::layer current_layer;
 		current_layer.clear();
@@ -159,8 +208,8 @@ int main (int argc, char **argv) {
 				cen_ndx = n0.first.get_clabels();
 				std::cout << "INFO:: HAVE NDX SIZE " << clu_ndx.size() << std::endl; 
 				std::vector<int> den_ndx	= n0.first.get_labels();
-				fIO.output_pdb("clu-nofit-n" + ns + ".pdb", carth_space , clu_ndx ); 
-				fIO.output_pdb("den-nofit-n" + ns + ".pdb", coord_space , den_ndx );
+				fIO.output_pdb("clu-nofit-n" + ns + ".pdb", vparts[1] , clu_ndx ); 
+				fIO.output_pdb("den-nofit-n" + ns + ".pdb", vparts[0] , den_ndx );
 			}
 		}
 
@@ -182,34 +231,33 @@ int main (int argc, char **argv) {
 		}
 	}
 	richanalysis::layer_analysis	alayer(solved_layer);
-
+*/
 	std::cout << "::ALTERNATIVE::" << std::endl;
 	n0.first.find_centroids();
 	n0.second.find_centroids();
 	richanalysis::node_analysis nnode(n0);
 //	
-	particles c_aligned = nnode.regular_fit();		// shape fit
-	for( int i=0 ; i<c_aligned.size() ; i++ )
-		c_aligned[i].first = carth_space[i].first;
-	fIO.output_pdb("test-can" + ns + ".pdb",  c_aligned );
+//	particles c_aligned = nnode.regular_fit();		// shape fit
+//	for( int i=0 ; i<c_aligned.size() ; i++ )
+//		c_aligned[i].first = carth_space[i].first;
+//	fIO.output_pdb("test-can" + ns + ".pdb",  c_aligned );
 
 //	PARTICLE ANALYSIS
-	std::cout << "INFO::PA::" << D << " & " << B << std::endl;
+	int D = L[0] , B = L[1];
+	std::cout << "INFO::PA:: " << D << " & " << B << std::endl;
 	richanalysis::particle_analysis pa,ps;
 	richanalysis::cluster cl4dg;
 
 	int NN=D>B?D:B;
 	int MM=D>B?B:D;
 	cl4dg.alloc_space(NN,MM);
-	if( D > B ) 
-	{
-		cl4dg.set_matrix(coord_space);
+	if( L[0] > L[1] ) {
+		cl4dg.set_matrix(vparts[0]);
 	}
-	else
-	{
-		cl4dg.set_matrix(carth_space);
+	else {
+		cl4dg.set_matrix(vparts[1]);
 	}
-	cl4dg.print_all();
+//	cl4dg.print_all();
 	richanalysis::coord_format cfp;
 	
 	gsl_matrix *pos_d	= gsl_matrix_calloc( DIM, NN );
@@ -219,11 +267,11 @@ int main (int argc, char **argv) {
 	gsl_vector *cid		= gsl_vector_calloc( NN );
 	gsl_vector *rho2	= gsl_vector_calloc( NN );
 
-	cl4dg.copyC(pos_c);		//	centroids	
-	cl4dg.copyM(pos_d);		//	clustered	
+	cl4dg.copyC(pos_c);		// centroids	
+	cl4dg.copyM(pos_d);		// clustered	
  	cl4dg.copyv(cid);
 
-  	for (int j = 0; j < NN; j++)
+  	for ( int j = 0; j < NN; j++ )
 	{
 		int id = gsl_vector_get(cid,j);
 		gsl_vector_view column = gsl_matrix_column ( pos_d, j  );
@@ -234,19 +282,21 @@ int main (int argc, char **argv) {
 		d	= gsl_blas_dnrm2 ( &column.vector );
 		d0	= gsl_vector_get (  sig , id	);
 		cnt0	= gsl_vector_get (  cnt , id	);
-		gsl_vector_set( sig , id, d0+d		);
-		gsl_vector_set( cnt , id, cnt0+1.0	);
+		gsl_vector_set( sig , id, d0 + d	);
+		gsl_vector_set( cnt , id, cnt0 + 1.0	);
 	}
 
 	double Er=0.0;
 	for (int j = 0; j < MM; j++)
 	{
-		Er+=gsl_vector_get(cnt,j);
-		std::cout << "INFO::STD::" << sqrt(gsl_vector_get(sig,j)/gsl_vector_get(cnt,j)) << " " << gsl_vector_get(cnt,j) << std::endl;
+		Er += gsl_vector_get(cnt,j);
+//		std::cout	<< "INFO::STD::" << sqrt(gsl_vector_get(sig,j)/gsl_vector_get(cnt,j)) 
+//				<< " " << gsl_vector_get(cnt,j) << std::endl;
 	}
-	std::cout << "INFO::ER::"<< Er/((float)MM) << std::endl;
+	std::cout << "INFO::EREST:: "<< Er/((float)MM) << std::endl;
 	particles red_parts = cfp.mat2par( pos_c , sig );
 
+	fIO.output_pdb("test-cents_" + ns + ".pdb",  red_parts );
 	gvec *r1 = gsl_vector_alloc( DIM );
 	gvec *r2 = gsl_vector_alloc( DIM );
 	gmat *DISTM = gsl_matrix_calloc(MM,MM);
@@ -275,19 +325,18 @@ int main (int argc, char **argv) {
 	richanalysis::particle_analysis single_reduction;
 	new_parts = single_reduction.assign_via_distmatrix(DISTM);
 
-	if( D > B ) 
+	if( L[0] > L[1] ) 
 	{
 		for(int i=0;i<MM;i++)
-			new_parts[i].first[0] = carth_space[i].first[0];
+			new_parts[i].first = vparts[1][i].first ;
 	}
 	else
 	{
 		for(int i=0;i<MM;i++)
-			new_parts[i].first[0] = coord_space[i].first[0];
+			new_parts[i].first = vparts[0][i].first ;
 	}
 
-	richanalysis::fileIO fio;
-	fio.output_geometry( new_parts, "new_parts.xyz");
+	fIO.output_geometry( new_parts, "new_parts.xyz");
 
 	return 0;
 }

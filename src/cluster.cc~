@@ -79,7 +79,7 @@ particle_analysis::assign_via_distmatrix( gmat *A ) {
 	gsl_matrix *X	= gsl_matrix_calloc( N , dspace );
 	gsl_matrix *Y	= gsl_matrix_calloc( dspace, N );
 	gsl_vector *b   = gsl_vector_calloc( N );
-	gsl_vector_set_all( b , 6.0 );
+	gsl_vector_set_all( b , 1.0 );
 
 	if( !complete() && !single() && (b->size==A->size1) )
 	{
@@ -450,7 +450,7 @@ particle_analysis::find_via_distance( gmat *A, ftyp level ) {
 	int sumZero = (level<0)?(1):(0);
 	if (sumZero)
 		level = sqrt(level*level);
-	std::cout <<"INFO::LEVEL="<< level << std::endl;
+	std::cout <<"INFO::FIND VIA DISTANCE::LEVEL "<< level << std::endl;
 	if( A->size1 == A->size2 ) {
 		for(int i=0; i<D; i++){
 			ftyp sum=0;
@@ -816,17 +816,17 @@ cluster::get_clabels( void ){
 
 bool
 node_analysis::assign_node( node n ) {
-
+	std::cout << "INFO:: ASSIGNING NODE" << std::endl;
 	n.first.find_centroids();
 	n.second.find_centroids();
-	std::cout << "INFOINFO::HAVE::length_C:: " << n.second.length_C() << std::endl;
+//	std::cout << "INFOINFO::HAVE::length_C:: " << n.second.length_C() << std::endl;
 	cluster c1 = n.first;
 	cluster c2 = n.second;
 	std::vector<int> cindx;
 
 	int N, M, L, K;
 	int rDIM=c1.get_cDIM();
-	std::cout << "INFOINFO::HAVE::CDIM:: " << rDIM << std::endl;
+//	std::cout << "INFOINFO::HAVE::CDIM:: " << rDIM << std::endl;
 	if( c1.get_cDIM() != c2.get_cDIM() ) {
 		std::cout << "ERROR WITH DIMENSION OF CLUSTER PAIRS" << std::endl;
 		bNode_= false; bLayer_= false;
@@ -840,7 +840,7 @@ node_analysis::assign_node( node n ) {
 		N = c2.length_M();
 		M = c2.length_C();
 		K = c1.length_C();
-		std::cout << "INFOINFO::HAVE::M:: " << M << std::endl;
+//		std::cout << "INFOINFO::HAVE::M:: " << M << std::endl;
 		if( K == M && M == rDIM && rDIM>1 ) {
 
 			std::vector<int> vi;
