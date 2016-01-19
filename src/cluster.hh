@@ -67,10 +67,9 @@ namespace richanalysis {
 			cluster() { 	bSet_ = false; rDIM_=DIM; };
 			void		alloc_space ( int, int );
 			int		set_matrix( particles ); 
-			int		find_centroids( void );
-			std::vector<int>	get_labels( void );
-			std::vector<int>	get_clabels( void );
-
+			int			find_centroids	( void );
+			std::vector<int>	get_labels 	( void );
+			std::vector<int>	get_clabels	( void );
 			void		copyC(gmat *C0) { 
 						if(C0->size1==C_->size1&&C0->size2==C_->size2) { gsl_matrix_memcpy(C0, C_); } 
 					};
@@ -106,6 +105,7 @@ namespace richanalysis {
 							output_matrix( C_ );
 							output_vector(wc_ );
 						} ;
+			particles	get_model(void);
 		private:
 			gmat	*M_; 		// 0 THE ORIGINAL COORDINATES 
 			gmat	*C_; 		// 1 THE CENTROIDS
@@ -148,7 +148,8 @@ namespace richanalysis {
 			bool			allSet()	{ return ( bNode_ && bLayer_ ); };
 			bool			haveNode()	{ return ( bNode_); };
 			bool			haveLayer()	{ return ( bLayer_ ); };
-			layer			get_node_layer( void ){ return children_; };	
+			layer			get_node_layer	( void ) { return children_; } ;
+			node			get_parents	( void ) { return parents_ ; } ;	
 			void			print_all(void){ parents_.first.print_all();parents_.second.print_all();};		
 			~node_analysis(){};
 		private:
@@ -163,8 +164,8 @@ namespace richanalysis {
 
 	class layer_analysis : public fileIO {
 		public:
-			layer_analysis(){ bSet_ = false; };
-			layer_analysis(layer l){ bSet_ = true; own_=l; };
+			layer_analysis( ){ bSet_ = false; };
+			layer_analysis( layer l ){ bSet_ = true; own_=l; };
 			void output_layer( std::string );
 		private:
 			layer	own_;

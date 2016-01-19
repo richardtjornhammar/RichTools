@@ -526,7 +526,7 @@ bool sort_func(std::pair<ftyp, std::pair< int, int > > i1,std::pair<ftyp, std::p
 
 std::vector< int >
 node_analysis::find_centroid_distance_relation( void ) {
-
+	int verbose=0;
 	gmat *C1 = gsl_matrix_calloc(	DIM, parents_.first.length_C()	);
 	gmat *C2 = gsl_matrix_calloc(	DIM, parents_.second.length_C()	);
 	gvec *ci = gsl_vector_calloc(	parents_.second.length_M()	);
@@ -559,7 +559,38 @@ node_analysis::find_centroid_distance_relation( void ) {
 	}
 	std::sort (vi.begin(), vi.end(), sort_func);
 
+	if(verbose)
+		for( int i=0 ; i<vi.size() ; i++ )
+			std::cout << "INFO:: \t" << i << " \t " 
+			<< vi[i].second.first << "   " 
+			<< vi[i].second.second << std::endl; 
+
+	std::vector< std::pair<ftyp, std::pair< int, int > > > vir;
+	std::vector<int> vi_fin, vi0;
+	while( vir.size() < C1->size2 ) {
+		for( int i=0 ; i<vi.size() ; i++ ) {
+			bool exists=false;
+			int I = vi[i].second.first, J = vi[i].second.second;
+			for( int j=0; j<vir.size(); j++)
+				if( vir[j].second.first == I || vir[j].second.second == J)
+					exists=true;
+			if(!exists) {
+				vir.push_back(vi[i]);
+				vi_fin.push_back(-1);
+			}
+		}
+	}
+
+	for( int i=0 ; i<vir.size() ; i++ ){
+		if(verbose)
+			std::cout << "FOUND:: \t" << i << " \t " 
+			<< vir[i].second.first << "   " 
+			<< vir[i].second.second << std::endl; 
+		vi_fin[vir[i].second.second]=vir[i].second.first;
+	}
+/*
 	std::vector<int> vi1, vi2, vi_fin;
+	std::vector< std::pair< int , int > > indx_fin;
 	for( int i=0 ; i<C1->size2 ; i++ ) {
 		vi1.push_back(		 1	);
 		vi2.push_back(		 1	);
@@ -571,12 +602,20 @@ node_analysis::find_centroid_distance_relation( void ) {
 		i2 = vi[i].second.second;
 		if( vi_fin[i2] < 0 && vi1[i1] ) {
 			vi_fin[i2]	= i1;
+			std::pair< int, int > ips;
+			ips.first = i1; ips.second = i2;
+			indx_fin.push_back(ips);
 			vi1[i1]		=  0;
 			vi2[i2]		=  0;
 		}
 	}
 
-	return vi_fin; // should be unique id correspondance
+	for( int i=0 ; i<vi.size() ; i++ ) {
+		std::cout << "INFO:: \t" << i << " \t " << vi_fin[i] << " \t "  
+			 << indx_fin[i].first << " \t " << indx_fin[i].second << std::endl;
+	}
+*/
+	return vi_fin;
 };
 
 bool sort_f00(std::pair< int, int >  i1, std::pair< int, int > i2) {
@@ -814,6 +853,18 @@ cluster::get_clabels( void ){
 	return ndx;
 }
 
+particles
+cluster::get_model( void ){
+	richanalysis::coord_format cfp;
+	if( bSet_ ) {
+		particles red_parts = cfp.mat2par( M_ , vc_ );
+		return red_parts;
+	} else {
+		particles red_parts;
+		return red_parts;
+	}
+}
+
 bool
 node_analysis::assign_node( node n ) {
 	std::cout << "INFO:: ASSIGNING NODE" << std::endl;
@@ -939,6 +990,7 @@ node_analysis::regular_fit(void) {
 
 	if( overwrite_model ) {
 		parents_.second.set_matrix(pf);
+		parents_.second.find_centroids();
 	}
 
 	return pf;

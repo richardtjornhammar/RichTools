@@ -60,13 +60,17 @@ int main (int argc, char **argv) {
 			args.push_back(argv[i]);
 	}
 	std::pair< std::string , std::string > poop;
-	poop.first = "-iden";
+	poop.first  = "-iden";
+	poop.second = "inpd.xyz";
 	opts.push_back(poop);
-	poop.first = "-imod";
+	poop.first  = "-imod";
+	poop.second = "inpm.xyz";
 	opts.push_back(poop);
-	poop.first = "-omod";
+	poop.first  = "-omod";
+	poop.second = "outm.pdb";
 	opts.push_back(poop);
-	poop.first = "-oclu";
+	poop.first  = "-oclu";
+	poop.second = "outd.pdb";
 	opts.push_back(poop);
 
 	std::vector<std::string> 	iv_ext;
@@ -84,7 +88,7 @@ int main (int argc, char **argv) {
 		if	( args[arg] == "-h" ||  args[arg] =="--h" || args[arg] =="--help" || args[arg] =="-help") {
 			std::cout << "Usage: " << progname << "\n\t";
 			for( int opt=0 ; opt<opts.size() ; opt++ ){
-				std::cout << opts[opt].first << " \t [string] " << "\n\t";
+				std::cout << opts[opt].first << " \t " << opts[opt].second << "\n\t";
 			}
 			std::cout << "-h" << "\n\t" << "--h" << "\n\t"<< "--help" << "\n\t"<< "-help" << "\n\n";
 			std::cout << "Please contact" << author << "with any questions, comments or problems\n";
@@ -144,8 +148,152 @@ int main (int argc, char **argv) {
 	int N		= 3;
 	bool bFit	= true;
 	std::string ns	= std::to_string(N);
-//
-////DEBUG SECTION:: SINGLE PASS
+
+	richanalysis::node	n0;
+	particles model;
+	particles densi;
+
+	if( L[0] >= L[1] ) {
+		n0.first.set_matrix(  vparts[0] ); densi=vparts[0];
+		n0.second.set_matrix( vparts[1] ); model=vparts[1];
+	} else { 
+		n0.first.set_matrix(  vparts[1] ); model=vparts[0];
+		n0.second.set_matrix( vparts[0] ); densi=vparts[1];
+	}
+	int s=floor(model.size()/9);
+	s=s<3?3:s;
+	n0.first .set_cDIM(s);	
+	n0.second.set_cDIM(s);	
+	n0.first .find_centroids();
+	n0.second.find_centroids();
+	std::vector< int > n0flabels = n0.first .get_labels();
+	std::vector< int > n0slabels = n0.second.get_labels();
+
+	int sw = (L[1]>=L[0]) + 1;
+	int C = 1;
+
+	richanalysis::node_analysis nnode(n0);
+//	
+	particles c_aligned = nnode.regular_fit();	// shape fit
+	for( int i = 0 ; i < c_aligned.size() ; i++ )
+		c_aligned[i].first = model[i].first; 	// smaller returned
+
+	std::vector<int> ndx12 = nnode.find_centroid_distance_relation();
+	for(int i=0;i<ndx12.size();i++)
+		std::cout << "INDEX PAIR :: \t" << i << " \t "<< ndx12[i] << std::endl;
+
+	for(int i=0;i<n0slabels.size();i++)
+		n0slabels[i] = ndx12[ n0slabels[i] ];
+
+	fIO.output_pdb("nrm" + ns + opts[2].second , c_aligned	, n0slabels ); 
+	fIO.output_pdb("nrd" + ns + opts[3].second , densi 	, n0flabels ); 
+/*
+//	PARTICLE ANALYSIS
+	int D = L[0] , B = L[1];
+	std::cout << "INFO::PA:: " << D << " & " << B << std::endl;
+	richanalysis::particle_analysis		pa, ps;
+	richanalysis::cluster			cl4dg;
+
+	int NN = D>B ? D : B ;
+	int MM = D>B ? B : D ;
+	cl4dg.alloc_space(NN,MM);
+
+	if( L[0] > L[1] ) {
+		cl4dg.set_matrix(vparts[0]);
+	}
+	else {
+		cl4dg.set_matrix(vparts[1]);
+	}
+
+//	cl4dg.print_all();
+	richanalysis::coord_format cfp;
+	
+	gsl_matrix *pos_d	= gsl_matrix_calloc( DIM, NN );
+	gsl_matrix *pos_c	= gsl_matrix_calloc( DIM, MM );
+	gsl_vector *sig		= gsl_vector_calloc( NN );
+	gsl_vector *cnt		= gsl_vector_calloc( NN );
+	gsl_vector *cid		= gsl_vector_calloc( NN );
+	gsl_vector *rho2	= gsl_vector_calloc( NN );
+
+	cl4dg.copyC(pos_c);		// centroids	
+	cl4dg.copyM(pos_d);		// clustered	
+ 	cl4dg.copyv(cid);
+
+  	for ( int j = 0; j < NN; j++ )
+	{
+		int id = gsl_vector_get(cid,j);
+		gsl_vector_view column = gsl_matrix_column ( pos_d, j  );
+		gsl_vector_view col_mu = gsl_matrix_column ( pos_c, id );
+		double d,d0,cnt0;
+		gsl_vector_sub( &column.vector, &col_mu.vector );
+
+		d	= gsl_blas_dnrm2 ( &column.vector );
+		d0	= gsl_vector_get (  sig , id	);
+		cnt0	= gsl_vector_get (  cnt , id	);
+		gsl_vector_set( sig , id, d0 + d	);
+		gsl_vector_set( cnt , id, cnt0 + 1.0	);
+	}
+
+	double Er=0.0;
+	for (int j = 0; j < MM; j++)
+	{
+		Er += gsl_vector_get(cnt,j);
+	}
+	std::cout << "INFO::EREST:: "<< Er/((float)MM) << std::endl;
+	particles red_parts = cfp.mat2par( pos_c , sig );
+
+	gvec *r1 = gsl_vector_alloc( DIM );
+	gvec *r2 = gsl_vector_alloc( DIM );
+	gmat *DISTM = gsl_matrix_calloc(MM,MM);
+
+	double tbond=1.5;
+	tbond*=tbond;
+	double tprox=0.9;
+	tprox*=tprox;
+
+	for(int i=0;i<MM; i++){
+		double b = gsl_vector_get(sig,i);
+		b*=0.1;
+		for(int j=0;j<MM;j++){
+			gsl_matrix_get_col(r1,pos_c,i);
+			gsl_matrix_get_col(r2,pos_c,j);
+			gsl_vector_sub(r1,r2);
+			ftyp len = gsl_blas_dnrm2(r1);
+			len	*= len;
+			//len	 = len<tbond?tbond:len;
+			len	+= (i>j)?(len+b):(len-b);
+			gsl_matrix_set( DISTM, i, j, len );
+		}
+	}
+
+	particles new_parts;
+	richanalysis::particle_analysis single_reduction;
+	new_parts = single_reduction.assign_via_distmatrix(DISTM);
+
+	for(int i=0;i<MM;i++)
+		new_parts[i].first = model[i].first; // vparts[1][i].first ;
+	
+	richanalysis::cluster clnew;
+	clnew.set_matrix(new_parts);
+	clnew.find_centroids();
+	richanalysis::node	n1;
+	n1.first	= n0.second;
+	n1.second	= clnew;
+//	n1.first	= clnew;
+//	n1.second	= n0.second;
+	richanalysis::node_analysis nnode1(n1);
+	particles new_aligned = nnode.regular_fit();
+	for( int i = 0 ; i < new_aligned.size() ; i++ )
+		new_aligned[i].first = model[i].first; 
+	std::vector<int> labels = n1.first.get_labels();
+	std::cout << "::INFO::LABEL::SIZE::" << labels.size() << std::endl;
+	fIO.output_pdb("nrn1" + opts[2].second , new_aligned , labels);
+*/
+	return 0;
+}
+
+
+//// DEBUG SECTION:: SINGLE PASS
 /*
 	richanalysis::node	n0;
 	richanalysis::cluster	clu, clu2, clu1;
@@ -166,22 +314,8 @@ int main (int argc, char **argv) {
 */
 ////END DEBUG
 
-	richanalysis::layer	old_layer;
-	richanalysis::layer	solved_layer;
-	richanalysis::node	n0;
-
-	if( L[0] >= L[1] ) {
-		n0.first.set_matrix(  vparts[0] );
-		n0.second.set_matrix( vparts[1] ); 
-	}else{
-		n0.first.set_matrix(  vparts[1] );
-		n0.second.set_matrix( vparts[0] );
-	}
-
-	int sw = (L[1]>=L[0]) + 1;
-	old_layer.push_back(n0);
-	int C = 1;
 /*
+	old_layer.push_back(n0);
 	std::vector<int> clu_ndx,cen_ndx;
 	while ( solved_layer.size() !=  vparts[1].size() )
 	{
@@ -232,111 +366,3 @@ int main (int argc, char **argv) {
 	}
 	richanalysis::layer_analysis	alayer(solved_layer);
 */
-	std::cout << "::ALTERNATIVE::" << std::endl;
-	n0.first.find_centroids();
-	n0.second.find_centroids();
-	richanalysis::node_analysis nnode(n0);
-//	
-//	particles c_aligned = nnode.regular_fit();		// shape fit
-//	for( int i=0 ; i<c_aligned.size() ; i++ )
-//		c_aligned[i].first = carth_space[i].first;
-//	fIO.output_pdb("test-can" + ns + ".pdb",  c_aligned );
-
-//	PARTICLE ANALYSIS
-	int D = L[0] , B = L[1];
-	std::cout << "INFO::PA:: " << D << " & " << B << std::endl;
-	richanalysis::particle_analysis pa,ps;
-	richanalysis::cluster cl4dg;
-
-	int NN=D>B?D:B;
-	int MM=D>B?B:D;
-	cl4dg.alloc_space(NN,MM);
-	if( L[0] > L[1] ) {
-		cl4dg.set_matrix(vparts[0]);
-	}
-	else {
-		cl4dg.set_matrix(vparts[1]);
-	}
-//	cl4dg.print_all();
-	richanalysis::coord_format cfp;
-	
-	gsl_matrix *pos_d	= gsl_matrix_calloc( DIM, NN );
-	gsl_matrix *pos_c	= gsl_matrix_calloc( DIM, MM );
-	gsl_vector *sig		= gsl_vector_calloc( NN );
-	gsl_vector *cnt		= gsl_vector_calloc( NN );
-	gsl_vector *cid		= gsl_vector_calloc( NN );
-	gsl_vector *rho2	= gsl_vector_calloc( NN );
-
-	cl4dg.copyC(pos_c);		// centroids	
-	cl4dg.copyM(pos_d);		// clustered	
- 	cl4dg.copyv(cid);
-
-  	for ( int j = 0; j < NN; j++ )
-	{
-		int id = gsl_vector_get(cid,j);
-		gsl_vector_view column = gsl_matrix_column ( pos_d, j  );
-		gsl_vector_view col_mu = gsl_matrix_column ( pos_c, id );
-		double d,d0,cnt0;
-		gsl_vector_sub( &column.vector, &col_mu.vector );
-
-		d	= gsl_blas_dnrm2 ( &column.vector );
-		d0	= gsl_vector_get (  sig , id	);
-		cnt0	= gsl_vector_get (  cnt , id	);
-		gsl_vector_set( sig , id, d0 + d	);
-		gsl_vector_set( cnt , id, cnt0 + 1.0	);
-	}
-
-	double Er=0.0;
-	for (int j = 0; j < MM; j++)
-	{
-		Er += gsl_vector_get(cnt,j);
-//		std::cout	<< "INFO::STD::" << sqrt(gsl_vector_get(sig,j)/gsl_vector_get(cnt,j)) 
-//				<< " " << gsl_vector_get(cnt,j) << std::endl;
-	}
-	std::cout << "INFO::EREST:: "<< Er/((float)MM) << std::endl;
-	particles red_parts = cfp.mat2par( pos_c , sig );
-
-	fIO.output_pdb("test-cents_" + ns + ".pdb",  red_parts );
-	gvec *r1 = gsl_vector_alloc( DIM );
-	gvec *r2 = gsl_vector_alloc( DIM );
-	gmat *DISTM = gsl_matrix_calloc(MM,MM);
-
-	double tbond=1.5;
-	tbond*=tbond;
-	double tprox=0.9;
-	tprox*=tprox;
-
-	for(int i=0;i<MM; i++){
-		double b = gsl_vector_get(sig,i);
-		b*=0.1;
-		for(int j=0;j<MM;j++){
-			gsl_matrix_get_col(r1,pos_c,i);
-			gsl_matrix_get_col(r2,pos_c,j);
-			gsl_vector_sub(r1,r2);
-			ftyp len = gsl_blas_dnrm2(r1);
-			len	*= len;
-			//len	 = len<tbond?tbond:len;
-			len	+= (i>j)?(len+b):(len-b);
-			gsl_matrix_set( DISTM, i, j, len );
-		}
-	}
-
-	particles new_parts;
-	richanalysis::particle_analysis single_reduction;
-	new_parts = single_reduction.assign_via_distmatrix(DISTM);
-
-	if( L[0] > L[1] ) 
-	{
-		for(int i=0;i<MM;i++)
-			new_parts[i].first = vparts[1][i].first ;
-	}
-	else
-	{
-		for(int i=0;i<MM;i++)
-			new_parts[i].first = vparts[0][i].first ;
-	}
-
-	fIO.output_geometry( new_parts, "new_parts.xyz");
-
-	return 0;
-}
