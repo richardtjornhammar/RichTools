@@ -43,6 +43,12 @@
 #include "iofunc.hh"
 #include "cluster.hh"
 #include "gradient.hh"
+#include <algorithm>
+
+bool nsort_func(std::pair<double, std::pair< int, int > > i1,std::pair<ftyp, std::pair< int, int > > i2) {
+	return (i1.first<i2.first);
+};
+
 
 int main (int argc, char **argv) {
 //
@@ -160,33 +166,91 @@ int main (int argc, char **argv) {
 		n0.first.set_matrix(  vparts[1] ); model=vparts[0];
 		n0.second.set_matrix( vparts[0] ); densi=vparts[1];
 	}
-	int s=floor(model.size()/9);
-	s=s<3?3:s;
+	int s=floor(model.size()/8);
+	s=s<3?3:s; 
 	n0.first .set_cDIM(s);	
 	n0.second.set_cDIM(s);	
+
+	int sw	= (L[1]>=L[0]) + 1;
+	int C	= 1;
+
+// B	ORDER DEPENDENT
+	richanalysis::node_analysis nnode(n0);
+	particles c_aligned = nnode.regular_fit();	// shape fit
 	n0.first .find_centroids();
 	n0.second.find_centroids();
 	std::vector< int > n0flabels = n0.first .get_labels();
 	std::vector< int > n0slabels = n0.second.get_labels();
-
-	int sw = (L[1]>=L[0]) + 1;
-	int C = 1;
-
-	richanalysis::node_analysis nnode(n0);
-//	
-	particles c_aligned = nnode.regular_fit();	// shape fit
+// E
 	for( int i = 0 ; i < c_aligned.size() ; i++ )
 		c_aligned[i].first = model[i].first; 	// smaller returned
 
-	std::vector<int> ndx12 = nnode.find_centroid_distance_relation();
+	std::vector<int> ndx12 = nnode.find_centroid_distance_relation(); // 2->1 mapping
 	for(int i=0;i<ndx12.size();i++)
 		std::cout << "INDEX PAIR :: \t" << i << " \t "<< ndx12[i] << std::endl;
 
-	for(int i=0;i<n0flabels.size();i++)
-		n0flabels[i] = ndx12[ n0flabels[i] ];
+	for(int i=0;i<n0slabels.size();i++)
+		n0slabels[i] = ndx12[ n0slabels[i] ];
 
-	fIO.output_pdb("nrm" + ns + opts[2].second , c_aligned	, n0slabels ); 
-	fIO.output_pdb("nrd" + ns + opts[3].second , densi 	, n0flabels ); 
+	fIO.output_pdb("nrm" + std::to_string(s) + opts[2].second , c_aligned	, n0slabels ); 
+	fIO.output_pdb("nrd" + std::to_string(s) + opts[3].second , densi 	, n0flabels ); 
+
+//	HERE RETRIEVE ALL BORDER DENSITIES 
+/*
+	{
+		std::vector< std::pair< double , std::pair<int, int> > > vdij; // for each cluster
+		std::vector< std::vector< int > > cl_neighbors;
+		gsl_vector *ri = gsl_vector_calloc(DIM);
+		gsl_vector *rj = gsl_vector_calloc(DIM);
+
+		for( int i=0 ; i<densi.size() ; i++ )
+		{
+			for( int j=0 ; j<densi.size() ; j++ )
+			{
+				if( n0flabels[i] == n0flabels[j] )
+					continue;
+				gsl_vector_memcpy(ri , densi[i].second);
+				gsl_vector_memcpy(rj , densi[j].second);
+				gsl_vector_sub		( ri, rj );
+				double len = gsl_blas_dnrm2( ri );
+				std::pair< double , std::pair<int, int> > spdij;
+				spdij.first = len;
+				spdij.second.first = i; spdij.second.second = j;
+				vdij.push_back(spdij);
+			}
+		}
+		std::sort (vdij.begin(), vdij.end(), nsort_func );
+	}
+*/
+//	FOR EACH CLUSTER DO FIT
+	std::cout << "INFO\t" << ndx12.size() << std::endl;
+	particles solved;
+	for( int i=0 ; i<ndx12.size() ; i++ )
+	{
+		particles d_frag, m_frag;
+		for( int j=0 ; j<n0slabels.size() ; j++ )
+		{
+			if(n0slabels[j]==i)
+				m_frag.push_back( c_aligned	[ j ] );
+		}
+		for( int j=0 ; j<n0flabels.size() ; j++ )
+		{
+			if(n0flabels[j]==i)
+				d_frag.push_back( densi		[ j ] );
+		}
+		richanalysis::node	nf;
+		nf.first.set_matrix(  d_frag );
+		nf.second.set_matrix( m_frag );
+		richanalysis::node_analysis fnode(nf);
+		particles f_frag = fnode.regular_fit(1);
+		for( int j=0 ; j<f_frag.size() ; j++ ){
+			f_frag[j].first=m_frag[j].first;
+			solved.push_back( f_frag[j] );
+		}
+	}
+
+	fIO.output_pdb("nrs" + std::to_string(s) + opts[3].second , solved);	
+//
 /*
 //	PARTICLE ANALYSIS
 	int D = L[0] , B = L[1];

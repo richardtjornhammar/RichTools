@@ -127,6 +127,7 @@ namespace richanalysis {
 			std::vector< int >	find_centroid_relation( void );
 			std::vector< int >	find_centroid_distance_relation( void );
 			particles		regular_fit(	void	);
+			particles		regular_fit(	int	);
 			particles		centroid_frag_fit(	void	);
 			particles		seeded_centroids(	void	);
 			std::vector< int >	global_index_order ( void ) { return glob_idx_order_; };

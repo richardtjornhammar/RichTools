@@ -475,7 +475,7 @@ void
 cluster::alloc_space( int D1, int D2 ) {
 //D1	COORDINATE	SPACE
 //D2	CENTROID	SPACE
-	// std::cout << "ALLOC:: " << D1 << " " << D2 << std::endl;
+//	std::cout << "ALLOC:: " << D1 << " " << D2 << std::endl;
 	if( D1 > 0 && D2 > 0 ) {
 		M_	= gsl_matrix_calloc( DIM, D1 );	
 		C_	= gsl_matrix_calloc( DIM, D2 );	 
@@ -551,7 +551,7 @@ node_analysis::find_centroid_distance_relation( void ) {
 			gsl_matrix_get_col ( va, C1, i );
 			gsl_matrix_get_col ( vb, C2, j );
 			gsl_vector_sub( va, vb );
-			diff=gsl_blas_dnrm2(va);
+			diff = gsl_blas_dnrm2(va);
 			std::pair<ftyp, std::pair<int, int> > rel;
 			rel.first = diff*diff; rel.second.first=i; rel.second.second=j;
 			vi.push_back(rel);
@@ -586,7 +586,7 @@ node_analysis::find_centroid_distance_relation( void ) {
 			std::cout << "FOUND:: \t" << i << " \t " 
 			<< vir[i].second.first << "   " 
 			<< vir[i].second.second << std::endl; 
-		vi_fin[vir[i].second.first]=vir[i].second.second;
+		vi_fin[vir[i].second.second]=vir[i].second.first;
 	}
 /*
 	std::vector<int> vi1, vi2, vi_fin;
@@ -952,6 +952,52 @@ node_analysis::assign_node( node n ) {
 	return bNode_;
 }
 
+
+particles
+node_analysis::regular_fit( int choice ) {
+
+	particles pf;
+	cluster c1 	= parents_.first;
+	cluster c2 	= parents_.second;
+
+	gmat *P 	= gsl_matrix_calloc( DIM, c2.length_M());
+	gmat *Q 	= gsl_matrix_calloc( DIM, c1.length_M());
+	gmat *U 	= gsl_matrix_calloc( DIM, DIM );
+	gmat *iU 	= gsl_matrix_calloc( DIM, DIM );
+	gvec *it 	= gsl_vector_calloc( DIM );
+	gvec *t 	= gsl_vector_calloc( DIM );
+	gvec *vl 	= gsl_vector_calloc( c2.length_M() );
+
+	richanalysis::coord_format cf;
+
+	gsl_vector_set_all(vl,1);
+	c2.copyM(P);
+	c1.copyM(Q);
+
+	pf 		= cf.mat2par (P, vl);
+
+	std::cout << "INFO_INFO_INFO>" << c1.length_M() << " " << c2.length_M() << std::endl;
+
+	ftyp rmsd	= shape_fit( P, Q, U, t, choice ); 
+	output_matrix(U);
+	invert_fit	( U, t, iU, it );
+	output_matrix(iU);
+	apply_fit( pf, iU, it ); 
+
+	bool overwrite_model=true;
+	for( int i=0 ; i<pf.size() ; i++ ){
+		pf[i].first = "C";
+	}
+
+	if( overwrite_model ) {
+		parents_.second.set_matrix(pf);
+		parents_.second.find_centroids();
+	}
+
+	return pf;
+}
+
+
 particles
 node_analysis::regular_fit(void) {
 
@@ -1196,7 +1242,7 @@ clustering::gsl_seeded_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *
 	gsl_vector_set_zero(w);
 
 	int h, i, j;
-	ftyp old_error, error, TOL=1E-4; 
+	ftyp old_error, error, TOL=1E-10; 
 
 	do {
 		old_error = error, error = 0; 
@@ -1265,13 +1311,13 @@ clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw ){
 	gsl_vector_set_zero(w);
 
 	int h, i, j;
-	ftyp old_error, error = 1E30, TOL=1E-8; 
+	ftyp old_error, error = 1E30, TOL=1E-10; 
 
 	std::vector<int> myvector;
 	for (i=0; i<NN; ++i) myvector.push_back(i); 
 
 	for (i=0;i<KK;i++)
-		random_shuffle ( myvector.begin(), myvector.end() );
+	random_shuffle ( myvector.begin(), myvector.end() );
 
 //implement a distance check here
 

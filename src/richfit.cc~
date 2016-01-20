@@ -248,7 +248,6 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 ftyp 
 fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 			gmat *U , gvec *t , int type	) {	
-
 	if( !(	   P->size1 == Q->size1 
 		&& U->size1 == U->size2 && U->size1 == P->size1 
 		&& Q->size1 == U->size1 

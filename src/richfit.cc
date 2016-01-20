@@ -366,12 +366,14 @@ fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
 			default: break;
 		}
 //	BELOW CORRESPONDS TO WAHBA	M
-		gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, V2, 0.0, TMP ); 
-		gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, V1, TMP, 0.0, C ); 	
+		if( type<0 ) {
+			gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, V2, 0.0, TMP ); 
+			gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, V1, TMP, 0.0, C ); 
+		} else {	
 //	BELOW CORRESPONDS TO KABSCH	M^T
-//		gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, V1, 0.0, TMP ); 
-//		gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, V2, TMP, 0.0, C ); 	
-
+			gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, V1, 0.0, TMP ); 
+			gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, V2, TMP, 0.0, C ); 	
+		}
 		int dC = get_det(C);
 
 		gsl_matrix_memcpy( Ut , C );

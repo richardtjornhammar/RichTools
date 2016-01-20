@@ -125,7 +125,7 @@ namespace richanalysis {
 			node_analysis() { 		bNode_ = false; bLayer_ = false; 	};
 			node_analysis( node n ) { 	bNode_ = assign_node( n ); 		};
 			std::vector< int >	find_centroid_relation( void );
-			std::vector< std::pair< int , int > >	find_centroid_distance_relation( void );
+			std::vector< int >	find_centroid_distance_relation( void );
 			particles		regular_fit(	void	);
 			particles		centroid_frag_fit(	void	);
 			particles		seeded_centroids(	void	);
