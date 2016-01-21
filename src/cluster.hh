@@ -130,6 +130,8 @@ namespace richanalysis {
 			particles		regular_fit(	int	);
 			particles		centroid_frag_fit(	void	);
 			particles		seeded_centroids(	void	);
+			particles		get_centroids( int ) ;
+			particles		calc_border( ftyp t );
 			std::vector< int >	global_index_order ( void ) { return glob_idx_order_; };
 			std::vector< int >	cluster_index_order( void ) { return cidx_; };
 			std::pair<int,int>	size(void){ std::pair<int,int> pi; 

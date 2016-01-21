@@ -817,6 +817,96 @@ node_analysis::seeded_centroids() {
 	return pf;
 }
 
+particles
+node_analysis::calc_border( ftyp t )
+{
+	particles	border_parts;
+	int   NC 	= parents_.first .length_C();
+	gmat *Ci 	= gsl_matrix_calloc(DIM, parents_.first .length_C() );
+	gmat *Mi 	= gsl_matrix_calloc(DIM, parents_.first .length_M() );
+	gmat *Cj 	= gsl_matrix_calloc(DIM, parents_.second.length_C() );
+	gmat *Mj 	= gsl_matrix_calloc(DIM, parents_.second.length_M() );
+	gvec *rc	= gsl_vector_calloc(DIM);
+	gvec *dr	= gsl_vector_calloc(DIM);
+	gvec *r1	= gsl_vector_calloc(DIM);
+	gvec *r2	= gsl_vector_calloc(DIM);
+	gvec *rw	= gsl_vector_calloc(DIM);
+
+	parents_.first .copyC(Ci); parents_.first .copyM(Mi);
+	parents_.second.copyC(Cj); parents_.second.copyM(Mj);
+
+	if( parents_.first .length_C() == parents_.second.length_C() ) {
+		for(int i=0;i<NC;i++) {
+			for(int j=0;j<NC;j++) {
+				gsl_matrix_get_col	( r1, Ci, i );
+				gsl_matrix_get_col	( r2, Ci, j );
+				gsl_vector_memcpy	( rc, r1 );
+				gsl_vector_memcpy	( dr, r1 );
+				gsl_vector_add		( rc, r2 );
+				gsl_vector_sub		( dr, r2 );
+				double nr = gsl_blas_dnrm2(  dr	 );
+				gsl_vector_scale( rc , 0.5	 );
+				gsl_vector_scale( dr , 1.0/nr	 );
+				if( nr < 5.5 ) // MIGHT HAVE A BORDER
+				{
+					std::cout << "INFO::GOT BORDER" << std::endl;
+				}
+
+			}
+		}
+	}
+	gsl_matrix_free(Ci);
+	gsl_matrix_free(Cj);
+	gsl_matrix_free(Mi);
+	gsl_matrix_free(Mj);
+	gsl_vector_free(rc);
+	gsl_vector_free(dr);
+	gsl_vector_free(r1);
+	gsl_vector_free(r2);
+	gsl_vector_free(rw);
+
+	return		border_parts;
+}
+
+particles
+node_analysis::get_centroids( int sw ) 
+{
+	particles pfc;
+	richanalysis::coord_format cf;
+	switch(sw){
+		case 1:	{
+				gvec *w = gsl_vector_calloc(	 parents_.first .length_C() );
+				gsl_vector_set_all(w,1);
+				gmat *C = gsl_matrix_calloc(DIM, parents_.first .length_C() );
+				parents_.first .copyC(C);		
+				pfc 	= cf.mat2par (C, w);
+				gsl_matrix_free(C);
+				gsl_vector_free(w);
+			}
+			break;
+		case 2: {
+				gvec *w = gsl_vector_calloc(	 parents_.second.length_C() );
+				gsl_vector_set_all(w,1);
+				gmat *C = gsl_matrix_calloc(DIM, parents_.second.length_C() );
+				parents_.second.copyC(C);
+				pfc 	= cf.mat2par (C, w);
+				gsl_matrix_free(C);
+				gsl_vector_free(w);
+			}
+			break;
+		default:
+			break;
+	}
+
+	for(int i=0;i<pfc.size();i++)
+		if(sw==1)
+			pfc[i].first="Ar";
+		else
+			pfc[i].first="U";
+	return pfc;
+}
+
+
 int
 cluster::find_centroids(){
 	if( bSet_ ) {

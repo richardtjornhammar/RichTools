@@ -167,7 +167,7 @@ int main (int argc, char **argv) {
 		n0.second.set_matrix( vparts[0] ); densi=vparts[1];
 	}
 	int s=floor(model.size()/8);
-	s=s<3?3:s; s++;
+	s=s<3?3:s; 
 	n0.first .set_cDIM(s);	
 	n0.second.set_cDIM(s);	
 
@@ -181,6 +181,10 @@ int main (int argc, char **argv) {
 	n0.second.find_centroids();
 	std::vector< int > n0flabels = n0.first .get_labels();
 	std::vector< int > n0slabels = n0.second.get_labels();
+	particles cents1 = nnode.get_centroids( 1 );
+	fIO.output_pdb("cen" + std::to_string(1) + opts[2].second , cents1 ); 
+ 	particles cents2 = nnode.get_centroids( 2 );
+	fIO.output_pdb("cen" + std::to_string(2) + opts[2].second , cents2 ); 
 // E
 	for( int i = 0 ; i < c_aligned.size() ; i++ )
 		c_aligned[i].first = model[i].first; 	// smaller returned
