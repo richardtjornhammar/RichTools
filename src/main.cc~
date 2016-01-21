@@ -169,7 +169,9 @@ int main (int argc, char **argv) {
 	int s=floor(model.size()/8);
 	s=s<3?3:s; 
 	n0.first .set_cDIM(s);	
+	n0.first .realloc_centroids(s);
 	n0.second.set_cDIM(s);	
+	n0.second.realloc_centroids(s);
 
 	int sw	= (L[1]>=L[0]) + 1;
 	int C	= 1;
@@ -179,6 +181,7 @@ int main (int argc, char **argv) {
 	particles c_aligned = nnode.regular_fit();	// shape fit
 	n0.first .find_centroids();
 	n0.second.find_centroids();
+
 	std::vector< int > n0flabels = n0.first .get_labels();
 	std::vector< int > n0slabels = n0.second.get_labels();
 // ONLY FOR SHOW
@@ -195,11 +198,13 @@ int main (int argc, char **argv) {
 	for(int i=0;i<ndx12.size();i++)
 		std::cout << "INDEX PAIR :: \t" << i << " \t "<< ndx12[i] << std::endl;
 
-	for(int i=0;i<n0slabels.size();i++)
-		n0slabels[i] = ndx12[ n0slabels[i] ];
+	for(int i=0;i<n0flabels.size();i++)
+		n0flabels[i] = ndx12[ n0flabels[i] ];
 
-	fIO.output_pdb("nrm" + std::to_string(s) + opts[2].second , c_aligned	, n0slabels ); 
+	fIO.output_pdb("nrm" + std::to_string(s) + opts[2].second , c_aligned	, n0slabels ); // reassigning model labels
 	fIO.output_pdb("nrd" + std::to_string(s) + opts[3].second , densi 	, n0flabels ); 
+
+	particles border = nnode.calc_border(0.05);
 
 //	HERE RETRIEVE ALL BORDER DENSITIES 
 /*

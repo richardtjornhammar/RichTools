@@ -66,7 +66,8 @@ namespace richanalysis {
 		public:
 			cluster() { 	bSet_ = false; rDIM_=DIM; };
 			void		alloc_space ( int, int );
-			int		set_matrix( particles ); 
+			void 		realloc_centroids( int );
+			int		set_matrix( particles  ); 
 			int			find_centroids	( void );
 			std::vector<int>	get_labels 	( void );
 			std::vector<int>	get_clabels	( void );

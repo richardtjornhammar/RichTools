@@ -43,6 +43,7 @@
 #include "richtypes.h"
 #include "cluster.hh"
 #include <algorithm>
+#include <random>
 
 using namespace richanalysis;
 
@@ -488,6 +489,18 @@ cluster::alloc_space( int D1, int D2 ) {
 	}
 }
 
+void
+cluster::realloc_centroids( int D2 ) {
+	if( D2 > 0 && bSet_ ) {
+		gsl_matrix_free(C_ );
+		gsl_vector_free(wc_);
+		gsl_vector_free(ws_);
+		C_	= gsl_matrix_calloc( DIM, D2 );	 
+		wc_	= gsl_vector_calloc( D2 );
+		ws_	= gsl_vector_calloc( D2 ); // centroid sigma
+	}
+}
+
 int 
 cluster::set_matrix( particles coord_space ) {
 	int D		= coord_space.size();
@@ -820,7 +833,7 @@ node_analysis::calc_border( ftyp t )
 
 	if( parents_.first .length_C() == parents_.second.length_C() ) {
 		for(int i=0;i<NC;i++) { // DO THE DENSITY LOOP FIRST (LARGE SET)
-			std::cout << "INFO::PARENT::SIZE::" << gsl_vector_get( parents_.first.ws_,i ); 
+			std::cout << "INFO::PARENT::SIZE::" << gsl_vector_get(sigmas,i ) << std::endl; 
 			for(int j=i+1;j<NC;j++) {
 				gsl_matrix_get_col	( r1, Ci, i );
 				gsl_matrix_get_col	( r2, Ci, j );
@@ -834,6 +847,7 @@ node_analysis::calc_border( ftyp t )
 			}
 		}
 	}
+
 	gsl_matrix_free(Ci);
 	gsl_matrix_free(Cj);
 	gsl_matrix_free(Mi);
@@ -902,26 +916,25 @@ cluster::find_centroids( ) {
 			NperC_.push_back(numi);
 		}
 		double X[N], X2[N], Z[N], S[N];
-		for(int i=0;i<N;i++) 
+		std::cout << "INFO CENTROID SIGMA B : "<< N << " & " << M << std::endl;
+		for( int j=0; j<M ; j++ ) 
 		{
 			gvec *r_dump 	= gsl_vector_calloc( DIM );
 			gvec *r_cent 	= gsl_vector_calloc( DIM );
 			gvec *r_temp 	= gsl_vector_calloc( DIM );
-			int ic 		= gsl_vector_get( wc_, i );
-			X [i]  		= 0.0; 
-			X2[i]		= 0.0;
-			for( int j = 0; j<M; i++ ) 
-			{
-				if( ic != gsl_vector_get(vc_,j) )
-					continue;
-				gsl_matrix_get_col (r_dump, M_, j );
-				gsl_matrix_get_col (r_cent, C_, i );
-				gsl_vector_sub   ( r_dump, r_cent );
-				ftyp dlen = gsl_blas_dnrm2(r_dump );
-				X[i] += dlen; X2[i] += dlen*dlen; 
-				Z[i] += 1.0 ;
-			}
-			if( Z[i] > 1.0 ) {
+			int ic 		= gsl_vector_get( vc_, j );
+			X [ic]  	= 0.0; 
+			X2[ic]		= 0.0;
+
+			gsl_matrix_get_col (r_dump, M_,  j );
+			gsl_matrix_get_col (r_cent, C_, ic );
+			gsl_vector_sub   ( r_dump, r_cent  );
+			ftyp dlen = gsl_blas_dnrm2( r_dump );
+			X[ic] += dlen; X2[ic] += dlen*dlen; 
+			Z[ic] += 1.0 ;
+		}
+		for( int i=0 ; i<N ; i++ ) {
+			if( Z[i] > 1.0 )	{
 				S[i] = sqrt( X2[i]/(Z[i]-1.0) );
 			} else {
 				S[i] = 1e-3;
@@ -929,6 +942,7 @@ cluster::find_centroids( ) {
 			}
 			gsl_vector_set(ws_,i,S[i]);
 		}
+		std::cout << "INFO CENTROID SIGMA E" << std::endl;
 	}
 	return NperC_.size();
 }
@@ -1396,7 +1410,11 @@ clustering::gsl_seeded_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *
 int 
 clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw ){
 	int NN=dat->size2, MM=dat->size1, KK=cent->size2;
-
+//
+	std::mt19937 generator;
+	std::uniform_int_distribution<int> distribution(1,KK-1);
+	int roll = distribution(generator);
+//
 	gvec *labels = gsl_vector_calloc(NN);
 	gvec *counts = gsl_vector_calloc(KK);
 	gmat *tmp_ce = gsl_matrix_calloc(MM,KK);
@@ -1412,13 +1430,12 @@ clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw ){
 	ftyp old_error, error = 1E30, TOL=1E-10; 
 
 	std::vector<int> myvector;
-	for (i=0; i<NN; ++i) myvector.push_back(i); 
-
-	//for (i=0;i<KK;i++)
+	for ( i=0; i<NN; ++i ) myvector.push_back(i); 
+//	int step = floor(NN/KK);
+//	for ( i=0; i<KK; i++ ) myvector.push_back(distribution(generator));
+	for ( i=0; i < KK ; i++ )
 	random_shuffle ( myvector.begin(), myvector.end() );
-
-//implement a distance check here
-
+	
 	i=0;
 	for ( h=0 ; h<KK ; h++ ){
 		for ( j=XX ; j<=ZZ ; j++ ) { 
@@ -1429,9 +1446,9 @@ clustering::gsl_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw ){
 	do {
 		old_error = error, error = 0; 
 		for (i = 0; i < KK; i++ ) {
-			gsl_vector_set(counts,i,0);
+			gsl_vector_set( counts, i, 0 );
 			for (j = XX; j <= ZZ; j++){
-				gsl_matrix_set(tmp_ce,j,i,0.0);
+				gsl_matrix_set( tmp_ce, j, i, 0.0 );
 			}
  		}
 		for (h = 0; h < NN; h++) {
