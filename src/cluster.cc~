@@ -481,6 +481,7 @@ cluster::alloc_space( int D1, int D2 ) {
 		C_	= gsl_matrix_calloc( DIM, D2 );	 
 		vc_	= gsl_vector_calloc( D1 );
 		wc_	= gsl_vector_calloc( D2 );
+		ws_	= gsl_vector_calloc( D2 ); // centroid sigma
 		bSet_   = true;
 	} else {
 		std::cout << "ERROR IN ALLOCATION ROUTINE:: "<< D1 << ", " << D2 << std::endl;
@@ -588,33 +589,13 @@ node_analysis::find_centroid_distance_relation( void ) {
 			<< vir[i].second.second << std::endl; 
 		vi_fin[vir[i].second.second]=vir[i].second.first;
 	}
-/*
-	std::vector<int> vi1, vi2, vi_fin;
-	std::vector< std::pair< int , int > > indx_fin;
-	for( int i=0 ; i<C1->size2 ; i++ ) {
-		vi1.push_back(		 1	);
-		vi2.push_back(		 1	);
-		vi_fin.push_back(	-1	);
-	}
-	int i1,i2;
-	for( int i=0 ; i<vi.size() ; i++ ) {
-		i1 = vi[i].second.first ;
-		i2 = vi[i].second.second;
-		if( vi_fin[i2] < 0 && vi1[i1] ) {
-			vi_fin[i2]	= i1;
-			std::pair< int, int > ips;
-			ips.first = i1; ips.second = i2;
-			indx_fin.push_back(ips);
-			vi1[i1]		=  0;
-			vi2[i2]		=  0;
-		}
-	}
 
-	for( int i=0 ; i<vi.size() ; i++ ) {
-		std::cout << "INFO:: \t" << i << " \t " << vi_fin[i] << " \t "  
-			 << indx_fin[i].first << " \t " << indx_fin[i].second << std::endl;
+	MDidx_.clear();
+	for(int i=0; i<vi_fin.size() ;i++){
+		MDidx_.push_back(vi_fin[i]);
 	}
-*/
+	bMDlabels_=true;
+
 	return vi_fin;
 };
 
@@ -819,25 +800,28 @@ node_analysis::seeded_centroids() {
 
 particles
 node_analysis::calc_border( ftyp t )
-{
+{//first is the larger set
 	particles	border_parts;
 	int   NC 	= parents_.first .length_C();
 	gmat *Ci 	= gsl_matrix_calloc(DIM, parents_.first .length_C() );
 	gmat *Mi 	= gsl_matrix_calloc(DIM, parents_.first .length_M() );
 	gmat *Cj 	= gsl_matrix_calloc(DIM, parents_.second.length_C() );
 	gmat *Mj 	= gsl_matrix_calloc(DIM, parents_.second.length_M() );
+	gvec *sigmas 	= gsl_vector_calloc( 	parents_.first .length_C()  );
 	gvec *rc	= gsl_vector_calloc(DIM);
 	gvec *dr	= gsl_vector_calloc(DIM);
 	gvec *r1	= gsl_vector_calloc(DIM);
 	gvec *r2	= gsl_vector_calloc(DIM);
 	gvec *rw	= gsl_vector_calloc(DIM);
 
+	parents_.first .copyws(sigmas); 
 	parents_.first .copyC(Ci); parents_.first .copyM(Mi);
 	parents_.second.copyC(Cj); parents_.second.copyM(Mj);
 
 	if( parents_.first .length_C() == parents_.second.length_C() ) {
-		for(int i=0;i<NC;i++) {
-			for(int j=0;j<NC;j++) {
+		for(int i=0;i<NC;i++) { // DO THE DENSITY LOOP FIRST (LARGE SET)
+			std::cout << "INFO::PARENT::SIZE::" << gsl_vector_get( parents_.first.ws_,i ); 
+			for(int j=i+1;j<NC;j++) {
 				gsl_matrix_get_col	( r1, Ci, i );
 				gsl_matrix_get_col	( r2, Ci, j );
 				gsl_vector_memcpy	( rc, r1 );
@@ -847,11 +831,6 @@ node_analysis::calc_border( ftyp t )
 				double nr = gsl_blas_dnrm2(  dr	 );
 				gsl_vector_scale( rc , 0.5	 );
 				gsl_vector_scale( dr , 1.0/nr	 );
-				if( dr < 5.5 ) // MIGHT HAVE A BORDER
-				{
-					std::cout << "INFO::GOT BORDER" << std::endl;
-				}
-
 			}
 		}
 	}
@@ -864,6 +843,7 @@ node_analysis::calc_border( ftyp t )
 	gsl_vector_free(r1);
 	gsl_vector_free(r2);
 	gsl_vector_free(rw);
+	gsl_vector_free(sigmas);
 
 	return		border_parts;
 }
@@ -908,18 +888,46 @@ node_analysis::get_centroids( int sw )
 
 
 int
-cluster::find_centroids(){
+cluster::find_centroids( ) {
 	if( bSet_ ) {
-		int N=wc_->size;
-		int M=vc_->size;
+		int M=vc_->size; int N=wc_->size;
 		gsl_kmeans( M_ , vc_ , C_ , wc_ );
 		NperC_.clear();
-		for(int i=0;i<N;i++){
+		gsl_vector_set_all( ws_, 0.0 );
+		for(int i=0;i<N;i++) {
 			int numi=0;
 			for( int j=0 ; j<vc_->size ; j++ ) {
 				numi+=(gsl_vector_get(vc_,j)==i)?1:0;
 			}
 			NperC_.push_back(numi);
+		}
+		double X[N], X2[N], Z[N], S[N];
+		for(int i=0;i<N;i++) 
+		{
+			gvec *r_dump 	= gsl_vector_calloc( DIM );
+			gvec *r_cent 	= gsl_vector_calloc( DIM );
+			gvec *r_temp 	= gsl_vector_calloc( DIM );
+			int ic 		= gsl_vector_get( wc_, i );
+			X [i]  		= 0.0; 
+			X2[i]		= 0.0;
+			for( int j = 0; j<M; i++ ) 
+			{
+				if( ic != gsl_vector_get(vc_,j) )
+					continue;
+				gsl_matrix_get_col (r_dump, M_, j );
+				gsl_matrix_get_col (r_cent, C_, i );
+				gsl_vector_sub   ( r_dump, r_cent );
+				ftyp dlen = gsl_blas_dnrm2(r_dump );
+				X[i] += dlen; X2[i] += dlen*dlen; 
+				Z[i] += 1.0 ;
+			}
+			if( Z[i] > 1.0 ) {
+				S[i] = sqrt( X2[i]/(Z[i]-1.0) );
+			} else {
+				S[i] = 1e-3;
+				std::cout << "INFO::UNHEALTHY::CLUSTER" << std::endl;
+			}
+			gsl_vector_set(ws_,i,S[i]);
 		}
 	}
 	return NperC_.size();

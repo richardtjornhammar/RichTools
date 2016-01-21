@@ -198,7 +198,7 @@ int main (int argc, char **argv) {
 	for(int i=0;i<n0slabels.size();i++)
 		n0slabels[i] = ndx12[ n0slabels[i] ];
 
-	fIO.output_pdb("nrm" + std::to_string(s) + opts[2].second , c_aligned	, n0slabels ); 
+	fIO.output_pdb("nrm" + std::to_string(s) + opts[2].second , c_aligned	, n0slabels ); // reassigning model labels
 	fIO.output_pdb("nrd" + std::to_string(s) + opts[3].second , densi 	, n0flabels ); 
 
 //	HERE RETRIEVE ALL BORDER DENSITIES 

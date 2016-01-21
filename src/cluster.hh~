@@ -110,7 +110,8 @@ namespace richanalysis {
 			gmat	*M_; 		// 0 THE ORIGINAL COORDINATES 
 			gmat	*C_; 		// 1 THE CENTROIDS
 			gvec	*vc_;		// 0 UNSORTED LABELS
-			gvec	*wc_;		// 1 UNSORTED LABELS
+			gvec	*wc_;		// 1 UNSORTED LABELS		
+			gvec	*ws_;		// 1 SORTED SIGMAS (DATA -> CENTROID+SIGMA) STORED ON wc_ LABEL
 			int	bSet_;
 			ids	idlabels_;
 			std::vector< int >	NperC_;
@@ -122,7 +123,7 @@ namespace richanalysis {
 
 	class node_analysis : public fitting, public fileIO  {
 		public:
-			node_analysis() { 		bNode_ = false; bLayer_ = false; 	};
+			node_analysis() {	bNode_ = false; bLayer_ = false; bMDlabels_ = false;	};
 			node_analysis( node n ) { 	bNode_ = assign_node( n ); 		};
 			std::vector< int >	find_centroid_relation( void );
 			std::vector< int >	find_centroid_distance_relation( void );
@@ -131,6 +132,7 @@ namespace richanalysis {
 			particles		centroid_frag_fit(	void	);
 			particles		seeded_centroids(	void	);
 			particles		get_centroids( int ) ;
+			particles		calc_border( ftyp t );
 			std::vector< int >	global_index_order ( void ) { return glob_idx_order_; };
 			std::vector< int >	cluster_index_order( void ) { return cidx_; };
 			std::pair<int,int>	size(void){ std::pair<int,int> pi; 
@@ -157,10 +159,11 @@ namespace richanalysis {
 		private:
 			node	parents_;
 			layer	children_;
-			bool bNode_; bool bLayer_;
+			bool bNode_; bool bLayer_; bool bMDlabels_;
 			std::vector<int>  idx_;
 			std::vector<int> iidx_;
 			std::vector<int> cidx_;
+			std::vector<int> MDidx_;
 			std::vector<int> glob_idx_order_;
 	};
 
