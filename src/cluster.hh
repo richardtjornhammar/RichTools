@@ -71,6 +71,7 @@ namespace richanalysis {
 			int			find_centroids	( void );
 			std::vector<int>	get_labels 	( void );
 			std::vector<int>	get_clabels	( void );
+			void		calculate_neighbors( void );
 			void		copyws(gvec *sigs) {
 						if(sigs->size==ws_->size){ gsl_vector_memcpy(sigs, ws_); }
 					};
@@ -119,6 +120,8 @@ namespace richanalysis {
 			int	bSet_;
 			ids	idlabels_;
 			std::vector< int >	NperC_;
+			std::vector< std::vector<  int  > >	nnList_;
+			std::vector< std::vector<gvec * > >	nvList_;
 			int	rDIM_;
 	};
 	
@@ -133,10 +136,10 @@ namespace richanalysis {
 			std::vector< int >	find_centroid_distance_relation( void );
 			particles		regular_fit(	void	);
 			particles		regular_fit(	int	);
+			particles		calc_border( ftyp t );
 			particles		centroid_frag_fit(	void	);
 			particles		seeded_centroids(	void	);
 			particles		get_centroids( int ) ;
-			particles		calc_border( ftyp t );
 			std::vector< int >	global_index_order ( void ) { return glob_idx_order_; };
 			std::vector< int >	cluster_index_order( void ) { return cidx_; };
 			std::pair<int,int>	size(void){ std::pair<int,int> pi; 

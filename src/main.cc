@@ -198,62 +198,50 @@ int main (int argc, char **argv) {
 	for(int i=0;i<ndx12.size();i++)
 		std::cout << "INDEX PAIR :: \t" << i << " \t "<< ndx12[i] << std::endl;
 
-//	for(int i=0;i<n0flabels.size();i++)
-//		n0flabels[i] = ndx12[ n0flabels[i] ];
-
+	for(int i=0;i<n0slabels.size();i++)
+		n0slabels[i] = ndx12[ n0slabels[i] ];
+	n0.first .calculate_neighbors();
+	n0.second.calculate_neighbors();
 	fIO.output_pdb("nrm" + std::to_string(s) + opts[2].second , c_aligned	, n0slabels ); // reassigning model labels
 	fIO.output_pdb("nrd" + std::to_string(s) + opts[3].second , densi 	, n0flabels ); 
+	
+	//particles border = nnode.calc_border(0.05);
 
-	particles border = nnode.calc_border(0.05);
-
-//	HERE RETRIEVE ALL BORDER DENSITIES 
-/*
-	{
-		std::vector< std::pair< double , std::pair<int, int> > > vdij; // for each cluster
-		std::vector< std::vector< int > > cl_neighbors;
-		gsl_vector *ri = gsl_vector_calloc(DIM);
-		gsl_vector *rj = gsl_vector_calloc(DIM);
-
-		for( int i=0 ; i<densi.size() ; i++ )
-		{
-			for( int j=0 ; j<densi.size() ; j++ )
-			{
-				if( n0flabels[i] == n0flabels[j] )
-					continue;
-				gsl_vector_memcpy(ri , densi[i].second);
-				gsl_vector_memcpy(rj , densi[j].second);
-				gsl_vector_sub		( ri, rj );
-				double len = gsl_blas_dnrm2( ri );
-				std::pair< double , std::pair<int, int> > spdij;
-				spdij.first = len;
-				spdij.second.first = i; spdij.second.second = j;
-				vdij.push_back(spdij);
-			}
-		}
-		std::sort (vdij.begin(), vdij.end(), nsort_func );
-	}
-*/
 //	FOR EACH CLUSTER DO FIT
-	std::cout << "INFO\t" << ndx12.size() << std::endl;
+	if( verbose ) {
+		std::cout 	<< "INFO\t" << ndx12.size() 	<< std::endl;
+		std::cout 	<< "INFO\t" << n0slabels.size()	<< "  " 
+				<< n0flabels.size() 		<< std::endl;
+		for(int i=0;i< n0slabels.size();i++)
+			std::cout << " " << n0slabels[i];
+		std::cout << std::endl;
+	}
+
 	particles solved;
 	for( int i=0 ; i<ndx12.size() ; i++ )
 	{
 		particles d_frag, m_frag;
 		for( int j=0 ; j<n0slabels.size() ; j++ )
 		{
-			if(n0slabels[j]==i)
+			if( n0slabels[j]==i )
 				m_frag.push_back( c_aligned	[ j ] );
 		}
 		for( int j=0 ; j<n0flabels.size() ; j++ )
 		{
-			if(n0flabels[j]==i)
+			if( n0flabels[j]==i )
 				d_frag.push_back( densi		[ j ] );
 		}
+		//std::cout << "FRAG::INFO:: " << d_frag.size() << " / " << m_frag.size() << std::endl;
 		richanalysis::node	nf;
+		nf.first .set_cDIM(s);	
+		nf.second.set_cDIM(s);	
 		nf.first.set_matrix(  d_frag );
 		nf.second.set_matrix( m_frag );
+		//std::cout << "HERE1" << std::endl;
 		richanalysis::node_analysis fnode(nf);
-		particles f_frag = fnode.regular_fit(1);
+		//std::cout << "HERE2" << std::endl;
+		particles f_frag = fnode.regular_fit(-1);
+		//std::cout << "HERE3][" << f_frag.size() << " " << m_frag.size() << std::endl;
 		for( int j=0 ; j<f_frag.size() ; j++ ){
 			f_frag[j].first=m_frag[j].first;
 			solved.push_back( f_frag[j] );
