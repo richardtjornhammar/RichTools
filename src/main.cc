@@ -200,13 +200,15 @@ int main (int argc, char **argv) {
 
 	for(int i=0;i<n0slabels.size();i++)
 		n0slabels[i] = ndx12[ n0slabels[i] ];
+	std::cout << "INFO:: FIRST\n";
 	n0.first .calculate_neighbors();
+	std::cout << "INFO:: SECOND\n";
 	n0.second.calculate_neighbors();
 	fIO.output_pdb("nrm" + std::to_string(s) + opts[2].second , c_aligned	, n0slabels ); // reassigning model labels
 	fIO.output_pdb("nrd" + std::to_string(s) + opts[3].second , densi 	, n0flabels ); 
 	
 	//particles border = nnode.calc_border(0.05);
-
+/*
 //	FOR EACH CLUSTER DO FIT
 	if( verbose ) {
 		std::cout 	<< "INFO\t" << ndx12.size() 	<< std::endl;
@@ -249,6 +251,7 @@ int main (int argc, char **argv) {
 	}
 
 	fIO.output_pdb("nrs" + std::to_string(s) + opts[3].second , solved);	
+*/
 //
 /*
 //	PARTICLE ANALYSIS

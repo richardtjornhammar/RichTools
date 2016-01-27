@@ -814,25 +814,32 @@ node_analysis::seeded_centroids() {
 void
 cluster::calculate_neighbors(void)
 {
-	int verbose	= 0;
+	int verbose	= 1;
 	int   NC 	= length_C();
 	gmat *Ci 	= gsl_matrix_calloc(DIM,length_C() );
 	gmat *Mi 	= gsl_matrix_calloc(DIM,length_M() );
 	gvec *sigmas 	= gsl_vector_calloc( length_C()  );
+	gvec *m2c 	= gsl_vector_calloc( length_M()  );
 
 	gvec *rc	= gsl_vector_calloc(DIM);
 	gvec *dr	= gsl_vector_calloc(DIM);
-	gvec *r1	= gsl_vector_calloc(DIM);
-	gvec *r2	= gsl_vector_calloc(DIM);
+	gvec *rhat	= gsl_vector_calloc(DIM);
+	gvec *rI	= gsl_vector_calloc(DIM);
+	gvec *ri	= gsl_vector_calloc(DIM);
+	gvec *rj	= gsl_vector_calloc(DIM);
 	gvec *rw	= gsl_vector_calloc(DIM);
 
 	copyws(sigmas); 
-	copyC(Ci); copyM(Mi);
+	copyC(Ci); copyM(Mi); copyv(m2c);
 
 	if(verbose){
 		std::cout << "HAVE SIGMAS::";
 		for( int i=0 ; i<sigmas->size;i++)
 			std::cout << gsl_vector_get(sigmas,i) << " ";
+		std::cout << std::endl;
+		std::cout << "HAVE LABELS::";
+		for( int i=0 ; i<m2c->size;i++)
+			std::cout << gsl_vector_get(m2c,i) << " ";
 		std::cout << std::endl;
 	}
 /* 
@@ -841,18 +848,71 @@ cluster::calculate_neighbors(void)
 	rhd=rd/norm(rd)
 	for all in I
 		if  abs( rI-rc dot rhd ) < sigmas,i
-			j is i's neighbor 
-			sum up this rI and cnt_i
+			j is i's neighbor
+			check if j is in nnlist nothing else push and calloc an rJ calloc cnt_J
+			sum up this to rJ and cnt_J
+	
 */
-
 //	gsl_vector_get(vc_,i);
+//	i <-> j <==> j <-> i
+// INDEX -> NR_OF_NEIGHBORS+LIST
+
+	std::vector< std::vector< int > > nn_i;
+	for(int i=0;i<Ci->size2;i++) {
+		std::vector< int > vid;
+		vid.push_back(0);
+		nn_i.push_back(vid);
+		for(int j=0;j<Ci->size2;j++) {
+			if(i==j)
+				continue;
+			gsl_matrix_get_col	( ri, Ci, i 	);
+			gsl_matrix_get_col	( rj, Ci, j 	);
+			gsl_vector_memcpy	( rc, ri 	);
+			gsl_vector_add		( rc, rj 	);
+			gsl_vector_scale	( rc, 0.5 	); 	// MIDPOINT
+			gsl_vector_memcpy	( rhat, ri 	);	
+			gsl_vector_sub		( rhat, rj 	);
+			double nrd 	= 	gsl_blas_dnrm2( rhat );
+			gsl_vector_scale	( rhat, 1.0/nrd );	// DIRECTOR
+
+			double tol = 0.0;
+			double sig = gsl_vector_get(sigmas,i); 
+
+			for(int I=0;I<Mi->size2;I++){
+				if( gsl_vector_get(m2c,I) != i )
+					continue;
+				gsl_matrix_get_col	( rI, Mi, I );
+				gsl_vector_sub	  	( rI, rc );
+				gsl_blas_ddot( rI, rhat, &tol );
+				if(verbose)
+					std::cout << "TOL::" << tol << std::endl;
+				if( tol<sig*2.0 ) {			// HIT!		
+					nn_i[i][0]++;
+					nn_i[i].push_back(j);
+					break;				// STOP LOOKING 
+				}	
+			}	
+		}
+	}
+//	COLLAPSE THE LIST SO THAT ANY BORDER MEANS BORDER
+
+	for(int i=0;i<nn_i.size();i++){
+		std::cout << "CLUSTER " << i << " HAS SIGMA " << gsl_vector_get(sigmas,i) 
+			<<" AND "<< nn_i[i][0] << " NUMBER OF NEIGHBORS:\t "  << std::endl;
+		for(int j=1;j<nn_i[i].size();j++){
+			std::cout << " " << nn_i[i][j];
+		}
+		std::cout <<  std::endl;
+	}
 
 	gsl_matrix_free(Ci);
 	gsl_matrix_free(Mi);
 	gsl_vector_free(rc);
 	gsl_vector_free(dr);
-	gsl_vector_free(r1);
-	gsl_vector_free(r2);
+	gsl_vector_free(rI);
+	gsl_vector_free(ri);
+	gsl_vector_free(rj);
+	gsl_vector_free(rhat);
 	gsl_vector_free(rw);
 	gsl_vector_free(sigmas);
 
