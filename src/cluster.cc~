@@ -1175,14 +1175,14 @@ node_analysis::nn_restraint_fit( int verbose ) {
 	if( c1.length_C() != nc2.size() )
 		std::cout << "ERROR::BAD NEIGHBOR LIST" << std::endl;
 
-//	NEED TO IMPLEMENT ONE ROUTINE FOR PRINTING NEIGHBOR LIST...
-	parents_.first .print_neighbors();
-	parents_.second.print_neighbors();
+	if( verbose ) {
+//	FOR PRINTING NEIGHBOR LIST...
+		parents_.first .print_neighbors();
+		parents_.second.print_neighbors();
+	}
 
 	std::vector< std::pair< int, int > > common;
 	for( int i=0 ; i<c1.length_C() ; i++ ) {
-	//	std::cout << "INFO::" << "(" << i << ") " 
-	//		<< nc1[i][0] << " AND " << nc2[ndx21[i]][0] << std::endl;
 		if( nc1[i][0]>0 ) {
 			for( int j=1 ; j<=nc2[ndx21[i]][0] ; j++ ) {
 				for(int k=0;k<nc1[i][0];k++) {
@@ -1196,6 +1196,7 @@ node_analysis::nn_restraint_fit( int verbose ) {
 		}
 	}
 
+//	CREATE THE COMMON BORDER LIST
 	std::vector< std::vector< int > > common_nn;
 	for( int i=0 ; i<c1.length_C() ; i++ ) {
 		std::vector< int > nns;
@@ -1205,11 +1206,12 @@ node_analysis::nn_restraint_fit( int verbose ) {
 	for( int i=0 ; i<common.size() ; i++ ) {
 		bool bSkip=false;
 		for( int j=1 ; j<=common_nn[ common[i].first ][0] ; j++ ) {
+		//	MIGHT HAVE SYMMETRY ORDER ISSUE HERE, NOPE
 			if( common_nn[ common[i].first ][j] == common[i].second ){
 				bSkip=true; break;
 			}
 		}
-		if( !bSkip ){
+		if( !bSkip ) {
 			common_nn[common[i].first ][0]++;
 			common_nn[common[i].first ].push_back(common[i].second);
 			common_nn[common[i].second][0]++;
@@ -1217,20 +1219,34 @@ node_analysis::nn_restraint_fit( int verbose ) {
 		}
 
 	}
-	for( int i=0 ; i<common_nn.size() ; i++ ) {
-		std::cout << "INFO:: \t"<< i << "\t < " << common_nn[i][0] << " > " ;
-		for( int j=1 ; j<=common_nn[i][0] ; j++ ) {
-			std::cout << " " << common_nn[i][j];
+
+	if( verbose ) {
+		for( int i=0 ; i<common_nn.size() ; i++ ) {
+			std::cout << "INFO:: \t"<< i << "\t < " << common_nn[i][0] << " > " ;
+			for( int j=1 ; j<=common_nn[i][0] ; j++ ) {
+				std::cout << " " << common_nn[i][j];
+			}
+			std::cout << std::endl;
 		}
-		std::cout << std::endl;
 	}
-	
+
+//	WHICH INDEX IN THE MODEL IS CLOSEST TO THE SPECIFIC COMMON BORDER?
+//
+//
+// 
+
+//	BELOW IS A SCRATCH FIELD
+//	pf  = cf.mat2par (P, vl);
+//	if(verbose)
+//		std::cout << "<< INFO >>" << c1.length_M() << " " << c2.length_M() << std::endl;
 /*
-	pf  = cf.mat2par (P, vl);
-
-	if(verbose)
-		std::cout << "<< INFO >>" << c1.length_M() << " " << c2.length_M() << std::endl;
-
+//	DO ALL EIGHT
+			ftyp	shape_fit	(	gmat *P , gmat *Q ,	// IN
+					  		gvec *w1, gvec *w2, 	// IN
+					  		gmat *U , gvec *t ,	// OUT 
+					  		int II );
+*/
+/*
 	ftyp rmsd	= shape_fit( P, Q, U, t ); 
 	output_matrix(U);
 	invert_fit	( U, t, iU, it );
