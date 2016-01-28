@@ -64,7 +64,7 @@ namespace richanalysis {
 
 	class cluster :  public clustering {
 		public:
-			cluster() { 	bSet_ = false; rDIM_=DIM; };
+			cluster() { 	bSet_ = false; rDIM_=DIM; bHaveNN_=false; };
 			void		alloc_space ( int, int );
 			void 		realloc_centroids( int );
 			int		set_matrix( particles  ); 
@@ -72,6 +72,8 @@ namespace richanalysis {
 			std::vector<int>	get_labels 	( void );
 			std::vector<int>	get_clabels	( void );
 			void		calculate_neighbors( void );
+			bool		haveNN(){ return bHaveNN_; };
+			std::vector< std::vector<  int  > > get_neighbors(void) { return nnList_; };
 			void		copyws(gvec *sigs) {
 						if(sigs->size==ws_->size){ gsl_vector_memcpy(sigs, ws_); }
 					};
@@ -110,6 +112,7 @@ namespace richanalysis {
 							output_matrix( C_ );
 							output_vector(wc_ );
 						} ;
+			void		print_neighbors(void);
 			particles	get_model(void);
 		private:
 			gmat	*M_; 		// 0 THE ORIGINAL COORDINATES 
@@ -120,9 +123,9 @@ namespace richanalysis {
 			int	bSet_;
 			ids	idlabels_;
 			std::vector< int >	NperC_;
-			std::vector< std::vector<  int  > >	nnList_;
-			std::vector< std::vector<gvec * > >	nvList_;
-			int	rDIM_;
+			std::vector< std::vector<  int  > > nnList_;
+			int	rDIM_; 
+			bool bHaveNN_;
 	};
 	
 	typedef std::pair< cluster, cluster > node;
@@ -130,13 +133,13 @@ namespace richanalysis {
 
 	class node_analysis : public fitting, public fileIO  {
 		public:
-			node_analysis() {	bNode_ = false; bLayer_ = false; bMDlabels_ = false;	};
+			node_analysis() {	bNode_ = false; bLayer_ = false; bMDlabels_ = false;};
 			node_analysis( node n ) { 	bNode_ = assign_node( n ); 		};
 			std::vector< int >	find_centroid_relation( void );
 			std::vector< int >	find_centroid_distance_relation( void );
 			particles		regular_fit(	void	);
 			particles		regular_fit(	int	);
-			particles		calc_border( ftyp t );
+			particles		nn_restraint_fit( int );
 			particles		centroid_frag_fit(	void	);
 			particles		seeded_centroids(	void	);
 			particles		get_centroids( int ) ;

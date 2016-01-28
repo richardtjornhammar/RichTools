@@ -811,10 +811,28 @@ node_analysis::seeded_centroids() {
 	return pf;
 }
 
+
+void
+cluster::print_neighbors(void) {
+	if(bHaveNN_) {
+		for( int i=0 ; i<nnList_.size() ; i++ ) {
+			std::cout << "CLUSTER " << i << " HAS " 
+				<< nnList_[i][0] << " NEIGHBORS:  "  
+				<< std::endl;
+			for( int j=1 ; j<nnList_[i].size() ;j++ ) {
+				std::cout << " " << nnList_[i][j];
+			}
+			std::cout <<  std::endl;
+		}
+	} else {
+		std::cout << "ERROR::NO LIST" << std::endl;
+	}
+}
+
 void
 cluster::calculate_neighbors(void)
 {
-	int verbose	= 1;
+	int verbose	= 0;
 	int   NC 	= length_C();
 	gmat *Ci 	= gsl_matrix_calloc(DIM,length_C() );
 	gmat *Mi 	= gsl_matrix_calloc(DIM,length_M() );
@@ -831,6 +849,8 @@ cluster::calculate_neighbors(void)
 
 	copyws(sigmas); 
 	copyC(Ci); copyM(Mi); copyv(m2c);
+	nnList_.clear(); 
+	bHaveNN_=false;
 
 	if(verbose){
 		std::cout << "HAVE SIGMAS::";
@@ -842,28 +862,16 @@ cluster::calculate_neighbors(void)
 			std::cout << gsl_vector_get(m2c,i) << " ";
 		std::cout << std::endl;
 	}
-/* 
-	rc = (ri+rj)*.5
-	rd = ri-rj
-	rhd=rd/norm(rd)
-	for all in I
-		if  abs( rI-rc dot rhd ) < sigmas,i
-			j is i's neighbor
-			check if j is in nnlist nothing else push and calloc an rJ calloc cnt_J
-			sum up this to rJ and cnt_J
-	
-*/
-//	gsl_vector_get(vc_,i);
+
 //	i <-> j <==> j <-> i
 // INDEX -> NR_OF_NEIGHBORS+LIST
 
-	std::vector< std::vector< int > > nn_i;
 	for(int i=0;i<Ci->size2;i++) {
 		std::vector< int > vid;
 		vid.push_back(0);
-		nn_i.push_back(vid);
+		nnList_.push_back(vid);
 		for(int j=0;j<Ci->size2;j++) {
-			if(i==j)
+			if( i==j )
 				continue;
 			gsl_matrix_get_col	( ri, Ci, i 	);
 			gsl_matrix_get_col	( rj, Ci, j 	);
@@ -883,90 +891,44 @@ cluster::calculate_neighbors(void)
 					continue;
 				gsl_matrix_get_col	( rI, Mi, I );
 				gsl_vector_sub	  	( rI, rc );
-				gsl_blas_ddot( rI, rhat, &tol );
+				gsl_blas_ddot( rI, rhat, &tol ); 
 				if(verbose)
 					std::cout << "TOL::" << tol << std::endl;
-				if( tol<sig*2.0 ) {			// HIT!		
-					nn_i[i][0]++;
-					nn_i[i].push_back(j);
+				if( tol<sig*2.0 && tol >= 0.0 ) {			// HIT!		
+					nnList_[i][0]++;
+					nnList_[i].push_back(j);
 					break;				// STOP LOOKING 
 				}	
 			}	
 		}
 	}
-//	CHECK FOR INCOMPLETE NEIGHBOR PAIRS (NOT IMPLEMENTED)
 
-	for(int i=0;i<nn_i.size();i++){
-		std::cout << "CLUSTER " << i << " HAS SIGMA " << gsl_vector_get(sigmas,i) 
-			<<" AND "<< nn_i[i][0] << " NUMBER OF NEIGHBORS:\t "  << std::endl;
-		for(int j=1;j<nn_i[i].size();j++){
-			std::cout << " " << nn_i[i][j];
-		}
-		std::cout <<  std::endl;
-	}
+//	CHECK FOR INCOMPLETE NEIGHBOR PAIRS HERE (NOT IMPLEMENTED)
 
-	gsl_matrix_free(Ci);
-	gsl_matrix_free(Mi);
-	gsl_vector_free(rc);
-	gsl_vector_free(dr);
-	gsl_vector_free(rI);
-	gsl_vector_free(ri);
-	gsl_vector_free(rj);
-	gsl_vector_free(rhat);
-	gsl_vector_free(rw);
-	gsl_vector_free(sigmas);
-
-}
-
-particles
-node_analysis::calc_border( ftyp t )
-{//first is the larger set
-	particles	border_parts;
-	int   NC 	= parents_.first .length_C();
-	gmat *Ci 	= gsl_matrix_calloc(DIM, parents_.first .length_C() );
-	gmat *Mi 	= gsl_matrix_calloc(DIM, parents_.first .length_M() );
-	gmat *Cj 	= gsl_matrix_calloc(DIM, parents_.second.length_C() );
-	gmat *Mj 	= gsl_matrix_calloc(DIM, parents_.second.length_M() );
-	gvec *sigmas 	= gsl_vector_calloc( 	parents_.first .length_C()  );
-	gvec *rc	= gsl_vector_calloc(DIM);
-	gvec *dr	= gsl_vector_calloc(DIM);
-	gvec *r1	= gsl_vector_calloc(DIM);
-	gvec *r2	= gsl_vector_calloc(DIM);
-	gvec *rw	= gsl_vector_calloc(DIM);
-
-	parents_.first .copyws(sigmas); 
-	parents_.first .copyC(Ci); parents_.first .copyM(Mi);
-	parents_.second.copyC(Cj); parents_.second.copyM(Mj);
-
-	if( parents_.first .length_C() == parents_.second.length_C() ) {
-		for(int i=0;i<NC;i++) { // DO THE DENSITY LOOP FIRST (LARGE SET)
-			std::cout << "INFO::PARENT::SIZE::" << gsl_vector_get(sigmas,i ) << std::endl; 
-			for(int j=i+1;j<NC;j++) {
-				gsl_matrix_get_col	( r1, Ci, i );
-				gsl_matrix_get_col	( r2, Ci, j );
-				gsl_vector_memcpy	( rc, r1 );
-				gsl_vector_memcpy	( dr, r1 );
-				gsl_vector_add		( rc, r2 );
-				gsl_vector_sub		( dr, r2 );
-				double nr = gsl_blas_dnrm2(  dr	 );
-				gsl_vector_scale( rc , 0.5	 );
-				gsl_vector_scale( dr , 1.0/nr	 );
+	if(verbose) { 
+		for(int i=0;i<nnList_.size();i++) {
+			std::cout << "CLUSTER " << i << " HAS SIGMA " << gsl_vector_get(sigmas,i) 
+				<<" AND "<< nnList_[i][0] << " NUMBER OF NEIGHBORS:\t "  << std::endl;
+			for(int j=1;j<nnList_[i].size();j++){
+				std::cout << " " << nnList_[i][j];
 			}
+			std::cout <<  std::endl;
 		}
 	}
+	bHaveNN_=true;
 
-	gsl_matrix_free(Ci);
-	gsl_matrix_free(Cj);
-	gsl_matrix_free(Mi);
-	gsl_matrix_free(Mj);
-	gsl_vector_free(rc);
-	gsl_vector_free(dr);
-	gsl_vector_free(r1);
-	gsl_vector_free(r2);
-	gsl_vector_free(rw);
-	gsl_vector_free(sigmas);
+	gsl_matrix_free(	Ci	);
+	gsl_matrix_free(	Mi	);
+	gsl_vector_free(	rc	);
+	gsl_vector_free(	dr	);
+	gsl_vector_free(	rI	);
+	gsl_vector_free(	ri	);
+	gsl_vector_free(	rj	);
+	gsl_vector_free(	rhat	);
+	gsl_vector_free(	rw	);
+	gsl_vector_free(	sigmas	);
+	gsl_vector_free(	m2c	);
 
-	return		border_parts;
 }
 
 particles
@@ -1171,6 +1133,123 @@ node_analysis::assign_node( node n ) {
 	return bNode_;
 }
 
+particles
+node_analysis::nn_restraint_fit( int verbose ) {
+
+	particles pf;
+	cluster c1 	= parents_.first;
+	cluster c2 	= parents_.second;
+
+	gmat *P 	= gsl_matrix_calloc( DIM, c2.length_M());
+	gmat *Q 	= gsl_matrix_calloc( DIM, c1.length_M());
+	gmat *U 	= gsl_matrix_calloc( DIM, DIM );
+	gmat *iU 	= gsl_matrix_calloc( DIM, DIM );
+	gvec *it 	= gsl_vector_calloc( DIM );
+	gvec *t 	= gsl_vector_calloc( DIM );
+	gvec *vl 	= gsl_vector_calloc( c2.length_M() );
+
+	richanalysis::coord_format cf;
+
+	gsl_vector_set_all(vl,1);
+	c2.copyM(P);
+	c1.copyM(Q);
+
+//	HERE WE HAVE NEEDED DATA NOW FIND RESTRAINT POINTS FOR THE MODEL FIT		
+//	GOAL:	CHECK MUTUAL NEIGHBOR CORRESPONDANCE					
+//		CALCULATE A VECTOR POSITION (INTEGER OF DENSITY CLOSE TO BORDER) 		
+//		FIND THE (INTEGER) MODEL PART THAT BEST CORRESPONDS TO SUCH A MIDPOINT		NEW ROUTINE
+//		FIND THE BEST FIT THAT MINIMIZES THIS DISTANCE					OVERLOADED SHAPE FIT
+
+	if( !parents_.first.haveNN() || !parents_.second.haveNN() ) {
+		parents_.first .calculate_neighbors();
+		parents_.second.calculate_neighbors();
+	}
+
+	std::vector< std::vector<  int  > > nc1 = parents_.first .get_neighbors();
+	std::vector< std::vector<  int  > > nc2 = parents_.second.get_neighbors();
+	std::vector<int> ndx21 = find_centroid_distance_relation();
+
+//	DO TWO CLUSTERS HAVE A COMMON BORDER?
+	if( c1.length_C() != c2.length_C() )
+		std::cout << "ERROR::ILL FORMATED NODE" << std::endl;
+	if( c1.length_C() != nc2.size() )
+		std::cout << "ERROR::BAD NEIGHBOR LIST" << std::endl;
+
+//	NEED TO IMPLEMENT ONE ROUTINE FOR PRINTING NEIGHBOR LIST...
+	parents_.first .print_neighbors();
+	parents_.second.print_neighbors();
+
+	std::vector< std::pair< int, int > > common;
+	for( int i=0 ; i<c1.length_C() ; i++ ) {
+	//	std::cout << "INFO::" << "(" << i << ") " 
+	//		<< nc1[i][0] << " AND " << nc2[ndx21[i]][0] << std::endl;
+		if( nc1[i][0]>0 ) {
+			for( int j=1 ; j<=nc2[ndx21[i]][0] ; j++ ) {
+				for(int k=0;k<nc1[i][0];k++) {
+					if(nc2[ndx21[i]][j]==nc1[i][1+k]) {
+						std::pair< int, int > ip;
+						ip.first=i;ip.second=nc2[ndx21[i]][j];
+						common.push_back(ip);
+					}
+				}
+			}
+		}
+	}
+
+	std::vector< std::vector< int > > common_nn;
+	for( int i=0 ; i<c1.length_C() ; i++ ) {
+		std::vector< int > nns;
+		nns.push_back(0);
+		common_nn.push_back(nns);
+	}
+	for( int i=0 ; i<common.size() ; i++ ) {
+		bool bSkip=false;
+		for( int j=1 ; j<=common_nn[ common[i].first ][0] ; j++ ) {
+		//	MIGHT HAVE SYMMETRY ORDER ISSUE HERE
+			if( common_nn[ common[i].first ][j] == common[i].second ){
+				bSkip=true; break;
+			}
+		}
+		if( !bSkip ){
+			common_nn[common[i].first ][0]++;
+			common_nn[common[i].first ].push_back(common[i].second);
+			common_nn[common[i].second][0]++;
+			common_nn[common[i].second].push_back(common[i].first);
+		}
+
+	}
+	for( int i=0 ; i<common_nn.size() ; i++ ) {
+		std::cout << "INFO:: \t"<< i << "\t < " << common_nn[i][0] << " > " ;
+		for( int j=1 ; j<=common_nn[i][0] ; j++ ) {
+			std::cout << " " << common_nn[i][j];
+		}
+		std::cout << std::endl;
+	}
+	
+/*
+	pf  = cf.mat2par (P, vl);
+
+	if(verbose)
+		std::cout << "<< INFO >>" << c1.length_M() << " " << c2.length_M() << std::endl;
+
+	ftyp rmsd	= shape_fit( P, Q, U, t ); 
+	output_matrix(U);
+	invert_fit	( U, t, iU, it );
+	output_matrix(iU);
+	apply_fit( pf, iU, it ); 
+
+	bool overwrite_model=true;
+	for( int i=0 ; i<pf.size() ; i++ ){
+		pf[i].first = "C";
+	}
+
+	if( overwrite_model ) {
+		parents_.second.set_matrix(pf);
+		parents_.second.find_centroids();
+	}
+*/
+	return pf;
+}
 
 particles
 node_analysis::regular_fit( int choice ) {
