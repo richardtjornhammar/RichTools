@@ -67,15 +67,17 @@ namespace richanalysis {
 			cluster() { 	bSet_ = false; rDIM_=DIM; bHaveNN_=false; };
 			void		alloc_space ( int, int );
 			void 		realloc_centroids( int );
-			int		set_matrix( particles  ); 
+			int		set_matrix( particles  );
+			int 			calc_distance_matrix(void); 
 			int			find_centroids	( void );
 			std::vector<int>	get_labels 	( void );
 			std::vector<int>	get_clabels	( void );
-			void		calculate_neighbors( void );
+			void		calculate_neighbors( void );	   // via vector properties
+			void		calculate_nn_and_contacts( void ); // via model distmatrix
 			bool		haveNN(){ return bHaveNN_; };
 			std::vector< std::vector<  int  > > get_neighbors(void) { return nnList_; };
 			void		copyws(gvec *sigs) {
-						if(sigs->size==ws_->size){ gsl_vector_memcpy(sigs, ws_); }
+						if( sigs->size==ws_->size ) { gsl_vector_memcpy(sigs, ws_); }
 					};
 			void		copyC(gmat *C0) { 
 						if(C0->size1==C_->size1&&C0->size2==C_->size2) { gsl_matrix_memcpy(C0, C_); } 
@@ -111,9 +113,11 @@ namespace richanalysis {
 							output_vector(vc_ );
 							output_matrix( C_ );
 							output_vector(wc_ );
+							output_matrix( A_ );
 						} ;
 			void		print_neighbors(void);
 			particles	get_model(void);
+			ftyp		max_dist( void ) { return maxbond_; };
 		private:
 			gmat	*M_; 		// 0 THE ORIGINAL COORDINATES 
 			gmat	*C_; 		// 1 THE CENTROIDS
@@ -126,6 +130,9 @@ namespace richanalysis {
 			std::vector< std::vector<  int  > > nnList_;
 			int	rDIM_; 
 			bool bHaveNN_;
+//	FOR SETS WITH SMALL N (MODEL) AN ALTERNATIVE IS DISTANCE MATRICES
+			gmat 	*A_;
+			ftyp maxbond_;
 	};
 	
 	typedef std::pair< cluster, cluster > node;
@@ -140,7 +147,6 @@ namespace richanalysis {
 			particles		regular_fit(	void	);
 			particles		regular_fit(	int	);
 			particles		nn_restraint_fit( int );
-			//particles		calc_border( ftyp t );
 			particles		centroid_frag_fit(	void	);
 			particles		seeded_centroids(	void	);
 			particles		get_centroids( int ) ;
@@ -165,7 +171,8 @@ namespace richanalysis {
 			bool			haveLayer()	{ return ( bLayer_ ); };
 			layer			get_node_layer	( void ) { return children_; } ;
 			node			get_parents	( void ) { return parents_ ; } ;	
-			void			print_all(void){ parents_.first.print_all();parents_.second.print_all();};		
+			void			print_all(void) { parents_.first.print_all();
+								 parents_.second.print_all();};		
 			~node_analysis(){};
 		private:
 			node	parents_;

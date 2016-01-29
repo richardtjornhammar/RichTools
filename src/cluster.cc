@@ -311,6 +311,46 @@ particle_analysis::assign_matrices(void) {
 */
 }
 
+
+int 
+cluster::calc_distance_matrix(void) {
+
+	if( isSet() ) {
+		if(	A_	) 
+			gsl_matrix_free(A_);
+		A_  = gsl_matrix_alloc( M_->size2, M_->size2 );
+
+		gvec *r1 = gsl_vector_alloc( DIM );
+		gvec *r2 = gsl_vector_alloc( DIM );
+
+		int D = A_->size2;
+		ftyp xmin, x2min, X, X2;
+		for(int i=0;i<D; i++){
+			xmin=1E10;
+			for(int j=0;j<D;j++){
+				gsl_matrix_get_col(r1,M_,i);
+				gsl_matrix_get_col(r2,M_,j);
+				gsl_vector_sub(r1,r2);
+				ftyp len = gsl_blas_dnrm2(r1);
+				gsl_matrix_set( A_, i, j, len );
+				if(i!=j && len<xmin) {
+					xmin	= len;
+					x2min	= len*len;
+				}
+			}
+			X += xmin; X2 += x2min;
+		}
+		ftyp n   = A_->size2;
+		maxbond_ = X/n+sqrt( (X2-X*X/n)/n );
+
+		return 0;
+	}else{
+		std::cout << "ERROR::PARTICLE SETS NOT ASSIGNED" << std::endl;
+		return 1;
+	}
+}
+
+
 int 
 particle_analysis::calc_distance_matrices(void) {
 
@@ -1142,6 +1182,10 @@ node_analysis::nn_restraint_fit( int verbose ) {
 
 	gmat *P 	= gsl_matrix_calloc( DIM, c2.length_M());
 	gmat *Q 	= gsl_matrix_calloc( DIM, c1.length_M());
+
+	gmat *C 	= gsl_matrix_calloc( DIM, c2.length_C());
+	gmat *K 	= gsl_matrix_calloc( DIM, c1.length_C());
+
 	gmat *U 	= gsl_matrix_calloc( DIM, DIM );
 	gmat *iU 	= gsl_matrix_calloc( DIM, DIM );
 	gvec *it 	= gsl_vector_calloc( DIM );
@@ -1151,24 +1195,36 @@ node_analysis::nn_restraint_fit( int verbose ) {
 	richanalysis::coord_format cf;
 
 	gsl_vector_set_all(vl,1);
-	c2.copyM(P);
-	c1.copyM(Q);
+	c2.copyM(P); c2.copyC(C);
+	c1.copyM(Q); c1.copyC(K);
 
 //	HERE WE HAVE NEEDED DATA NOW FIND RESTRAINT POINTS FOR THE MODEL FIT		
 //	GOAL:	CHECK MUTUAL NEIGHBOR CORRESPONDANCE					
 //		CALCULATE A VECTOR POSITION (INTEGER OF DENSITY CLOSE TO BORDER) 		
 //		FIND THE (INTEGER) MODEL PART THAT BEST CORRESPONDS TO SUCH A MIDPOINT		NEW ROUTINE
-//		FIND THE BEST FIT THAT MINIMIZES THIS DISTANCE					OVERLOADED SHAPE FIT
+//		FIND THE BEST FIT THAT MINIMIZES THIS DISTANCE				OVERLOADED SHAPE FIT
 
-	if( !parents_.first.haveNN() || !parents_.second.haveNN() ) {
-		parents_.first .calculate_neighbors();
-		parents_.second.calculate_neighbors();
+	if( !c1.haveNN() || !c2.haveNN() ) {
+		c1.calculate_neighbors();
+		c2.calculate_neighbors();
 	}
+	c2.calc_distance_matrix(  );
+	std::cout << "INFO::MODEL::MAX::NN::DIST:: " << c2.max_dist() << std::endl; 
 
-	std::vector< std::vector<  int  > > nc1 = parents_.first .get_neighbors();
-	std::vector< std::vector<  int  > > nc2 = parents_.second.get_neighbors();
+	std::vector< std::vector<  int  > > nc1 = c1.get_neighbors();
+	std::vector< std::vector<  int  > > nc2 = c2.get_neighbors();
 	std::vector<int> ndx21 = find_centroid_distance_relation();
-
+	std::vector<int> ndx12;
+	for(int i=0;i<ndx21.size();i++) // init
+		ndx12.push_back(0.0);
+	for(int i=0;i<ndx21.size();i++) // set
+		ndx12[ndx21[i]]=i;
+	if( verbose ) { 
+		std::cout << "INFO::" << std::endl;
+		for(int i=0;i<ndx21.size();i++){
+			std::cout << " " << i << " | " << ndx21[i] << " " << ndx12[i] << std::endl;
+		}
+	}
 //	DO TWO CLUSTERS HAVE A COMMON BORDER?
 	if( c1.length_C() != c2.length_C() )
 		std::cout << "ERROR::ILL FORMATED NODE" << std::endl;
@@ -1177,8 +1233,8 @@ node_analysis::nn_restraint_fit( int verbose ) {
 
 	if( verbose ) {
 //	FOR PRINTING NEIGHBOR LIST...
-		parents_.first .print_neighbors();
-		parents_.second.print_neighbors();
+		c1.print_neighbors(); // LOCAL INDEXING
+		c2.print_neighbors(); // LOCAL INDEXING
 	}
 
 	std::vector< std::pair< int, int > > common;
@@ -1220,7 +1276,7 @@ node_analysis::nn_restraint_fit( int verbose ) {
 
 	}
 
-	if( verbose ) {
+	if( verbose ) { 
 		for( int i=0 ; i<common_nn.size() ; i++ ) {
 			std::cout << "INFO:: \t"<< i << "\t < " << common_nn[i][0] << " > " ;
 			for( int j=1 ; j<=common_nn[i][0] ; j++ ) {
@@ -1232,9 +1288,57 @@ node_analysis::nn_restraint_fit( int verbose ) {
 
 //	WHICH INDEX IN THE MODEL IS CLOSEST TO THE SPECIFIC COMMON BORDER?
 //	get midpoint from MBIG calc mindist in set MSMALL to midpoint
-//
+//	NOTE common_nn[i][0] IS (N)UMBER OF RESTRAINTS FOR i
+//		common_nn[i][j] IS THE MODEL NEIGHBOR CLUSTER INDEX
+//		N TIMES: CALCULATE THE MIDPOINT AND LOOP THIS MODEL 
+//			CLUSTER RETURN CLOSEST MODEL PART
 // 
+	gvec *r0 	= gsl_vector_calloc( DIM );
+	gvec *r1 	= gsl_vector_calloc( DIM );
+	gvec *r2 	= gsl_vector_calloc( DIM );
+	gvec *rm 	= gsl_vector_calloc( DIM );
+	std::vector< int > m_labels = c2.get_labels();
+//	HERE WE MIGHT HAVE THE WRONG CORRESPONDANCE 1->2 NOT 2->1, TRY BOTH
+	std::cout << "INFO::" << C->size2 << " AND " << K->size2 << std::endl;
+	std::cout << "INFO::" << P->size2 << " AND " << Q->size2 << std::endl;
+	std::cout << "INFO::" << m_labels.size() << std::endl;
+	for( int ic=0 ; ic<common_nn.size() ; ic++ ) {
+		gsl_matrix_get_col(r0,C,ic);
+		for( int ir=1 ; ir<=common_nn[ic][0] ; ir++ ) {
+			int ri = common_nn[ic][ir];
+			gsl_matrix_get_col	( r1, C, ri );
+			gsl_vector_memcpy	( r2, r0  );
+			gsl_vector_add		( r2, r1  );
+			gsl_vector_scale	( r2, 0.5 );
+			gsl_vector_memcpy	( rm, r2  );
+			double  mlen = 1E10;
+			int	imin = 0;
+			for(int im=0;im<P->size2;im++) {
+				if(ndx21[m_labels[im]] != ic )
+					continue;
+				gsl_matrix_get_col	( r1, P, im );
+				gsl_vector_memcpy	( r2, rm  );
+				gsl_vector_sub		( r2, r1  );
+				double len	= gsl_blas_dnrm2( r2 );
+				if( len < mlen ) {
+					imin = im; 
+					mlen = len;
+				}
+			}
+			std::cout << ic << " " << imin << std::endl;
+			std::cout << "::INFO::FOUND::"<< std::endl; 
+			//std::cout << "INFO::FOUND::IDX " << imin << " WITH LENGTH " << mlen << std::endl; 
+			gsl_matrix_get_col	( r1, P, imin );
+			richanalysis::tensorIO tIO;
+			tIO.output_vector(r1);
+		}
+	}
+	//output all of these restraint positions
 
+	gsl_vector_free(r0);
+	gsl_vector_free(r1);
+	gsl_vector_free(r2);
+	gsl_vector_free(rm);
 //	BELOW IS A SCRATCH FIELD
 //	pf  = cf.mat2par (P, vl);
 //	if(verbose)
@@ -1289,7 +1393,7 @@ node_analysis::regular_fit( int choice ) {
 
 	pf 		= cf.mat2par (P, vl);
 
-	std::cout << "INFO_INFO_INFO>" << c1.length_M() << " " << c2.length_M() << std::endl;
+	std::cout << "INFO > " << c1.length_M() << " " << c2.length_M() << std::endl;
 
 	ftyp rmsd	= shape_fit( P, Q, U, t, choice ); 
 	output_matrix(U);
