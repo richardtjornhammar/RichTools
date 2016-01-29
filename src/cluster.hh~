@@ -73,7 +73,7 @@ namespace richanalysis {
 			std::vector<int>	get_labels 	( void );
 			std::vector<int>	get_clabels	( void );
 			void		calculate_neighbors( void );	   // via vector properties
-			void		calculate_nn_and_contacts( void ); // via model distmatrix
+			void		calculate_nn_and_contacts( void ); // via model  distmatrix
 			bool		haveNN(){ return bHaveNN_; };
 			std::vector< std::vector<  int  > > get_neighbors(void) { return nnList_; };
 			void		copyws(gvec *sigs) {

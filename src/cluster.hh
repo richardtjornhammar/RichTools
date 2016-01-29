@@ -80,10 +80,16 @@ namespace richanalysis {
 						if( sigs->size==ws_->size ) { gsl_vector_memcpy(sigs, ws_); }
 					};
 			void		copyC(gmat *C0) { 
-						if(C0->size1==C_->size1&&C0->size2==C_->size2) { gsl_matrix_memcpy(C0, C_); } 
+						if(C0->size1==C_->size1&&C0->size2==C_->size2) 
+						{ gsl_matrix_memcpy(C0, C_); } 
+					};
+			void		copyA(gmat *A0) { 
+						if(A0->size1==A_->size1&&A0->size2==A_->size2) 
+						{ gsl_matrix_memcpy(A0, A_); } 
 					};
 			void		copyM(gmat *M0) { 
-						if(M0->size1==M_->size1&&M0->size2==M_->size2) { gsl_matrix_memcpy(M0, M_); } 
+						if(M0->size1==M_->size1&&M0->size2==M_->size2) 
+						{ gsl_matrix_memcpy(M0, M_); } 
 					};
 			void		copyv(gvec *v0) { 
 						if(v0->size ==vc_->size) { gsl_vector_memcpy(v0, vc_); } 

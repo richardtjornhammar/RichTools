@@ -870,6 +870,24 @@ cluster::print_neighbors(void) {
 }
 
 void
+cluster::calculate_nn_and_contacts(void)
+{
+	int verbose 	= 0 ;
+
+	calc_distance_matrix();
+	gmat *D		= gsl_matrix_calloc( length_M(), length_M() );
+	gvec *v		= gsl_vector_calloc( length_M() );
+//
+	//HERE NOW
+//
+	copyv(v);
+	copyA(D);
+
+	gsl_matrix_free(D);
+	gsl_vector_free(v);
+}
+
+void
 cluster::calculate_neighbors(void)
 {
 	int verbose	= 0;
@@ -1208,8 +1226,8 @@ node_analysis::nn_restraint_fit( int verbose ) {
 		c1.calculate_neighbors();
 		c2.calculate_neighbors();
 	}
-	c2.calc_distance_matrix(  );
-	std::cout << "INFO::MODEL::MAX::NN::DIST:: " << c2.max_dist() << std::endl; 
+
+	//std::cout << "INFO::MODEL::MAX::NN::DIST:: " << c2.max_dist() << std::endl; 
 
 	std::vector< std::vector<  int  > > nc1 = c1.get_neighbors();
 	std::vector< std::vector<  int  > > nc2 = c2.get_neighbors();
