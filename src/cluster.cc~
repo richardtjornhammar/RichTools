@@ -241,40 +241,59 @@ particle_analysis::assign_via_distmatrix( gmat *A , gvec *b ) {
 }
 
 void
+particle_analysis::print_model( std::string filename ) {
+		if( bAssigned_ ) {
+			richanalysis::fileIO fIO;
+			fIO.output_pdb( filename , model_ );
+		}
+}
+
+void
 particle_analysis::assign_matrices(void) {
 	std::vector< std::pair<ftyp, std::pair< int, int > > > vi;
 	rel_idx_.clear();
 
 	if( complete() ) {
-		int N	= model_.size();
-		A_	= gsl_matrix_calloc(model_.size(),model_.size());
-		B_ 	= gsl_matrix_calloc(model_.size(),model_.size());
-		C_	= gsl_matrix_calloc(DIM,model_.size());
+		int N		= model_.size();
+		A_		= gsl_matrix_calloc(model_.size(),model_.size());
+		B_ 		= gsl_matrix_calloc(model_.size(),model_.size());
+		C_		= gsl_matrix_calloc(DIM,model_.size());
 		gmat *P_	= gsl_matrix_calloc(DIM,model_.size());
-		M_ 	= gsl_matrix_calloc(DIM,density_.size());
-		vc_	= gsl_vector_calloc(density_.size());
-		wc_	= gsl_vector_calloc(model_.size());
-		gvec *r  = gsl_vector_alloc( DIM );
-		gvec *rc = gsl_vector_calloc( DIM );
-		for(int i=0;i<density_.size();i++) { 
-			gsl_vector_memcpy( r , density_[i].second ); 
-			gsl_matrix_set_col(M_, i, r);
-		}	
-		gsl_kmeans( M_ , vc_, C_, wc_ );
+		M_		= gsl_matrix_calloc(DIM,density_.size());
+		vc_		= gsl_vector_calloc(density_.size());
+		wc_		= gsl_vector_calloc(model_.size());
+		gvec *r		= gsl_vector_calloc( DIM );
+		gvec *rc	= gsl_vector_calloc( DIM );
 
-		for(int i=0;i<N;i++){
+		// IF SAME SIZE THEN DONT CLUSTER
+		if( !( density_size() == model_.size() ) ){
+			for(int i=0;i<density_.size();i++) { 
+				gsl_vector_memcpy( r , density_[i].second ); 
+				gsl_matrix_set_col(M_, i, r);
+			}	
+			gsl_kmeans( M_ , vc_, C_, wc_ );
+		}else{
+			gsl_matrix_memcpy( C_ , M_  );
+			gsl_vector_memcpy( wc_, vc_ );
+		}
+		// REGULAR ALIGNMENT TO
+		richanalysis::fitting rfit;
+		U_ 	= gsl_matrix_calloc( DIM , DIM );
+		t_ 	= gsl_vector_calloc( DIM );
+		float diff	= rfit.kabsch_fit( P_ , C_ , U_ , t_ );
+		bHaveUt_	= true;
+		rfit.apply_fit	( model_ , U_ , t_ );
 
-			double min_d=1e10;
+		for(int i=0;i<N;i++) {
+			double min_d = 1e10;
 			gsl_vector_memcpy( r , model_[i].second ); 
-			gsl_matrix_set_col(P_, i, r);
-
-			for( int j=0; j<N; j++ ){
-				gsl_vector_memcpy	( r , model_[i].second ); 
+			// gsl_matrix_set_col(P_, i, r);
+			for( int j=0; j<N; j++ ) {
+				gsl_vector_memcpy 	( r , model_[i].second ); 
 				gsl_matrix_get_col	( rc, C_ , j ); 
-				gsl_vector_sub		( rc, r );
-				double len = gsl_blas_dnrm2( rc );
-				len=len*len;
-				
+				gsl_vector_sub	  	( rc, r );
+				double len	= 	gsl_blas_dnrm2( rc );
+				len		= 	len*len;
 				if( len < min_d ) {
 					std::pair<ftyp, std::pair<int, int> > rel;
 					rel.first = len; rel.second.first=i; rel.second.second=j;
@@ -311,14 +330,16 @@ particle_analysis::assign_matrices(void) {
 */
 }
 
-
 int 
-cluster::calc_distance_matrix(void) {
+cluster::calc_distance_matrix(int i) {
 
 	if( isSet() ) {
 		if(	A_	) 
 			gsl_matrix_free(A_);
-		A_  = gsl_matrix_alloc( M_->size2, M_->size2 );
+		if(i>=0)
+			A_  = gsl_matrix_alloc( M_->size2, M_->size2 );
+		else
+			A_  = gsl_matrix_alloc( C_->size2, C_->size2 );
 
 		gvec *r1 = gsl_vector_alloc( DIM );
 		gvec *r2 = gsl_vector_alloc( DIM );
@@ -328,8 +349,13 @@ cluster::calc_distance_matrix(void) {
 		for(int i=0;i<D; i++){
 			xmin=1E10;
 			for(int j=0;j<D;j++){
-				gsl_matrix_get_col(r1,M_,i);
-				gsl_matrix_get_col(r2,M_,j);
+				if( i>=0 ) {
+					gsl_matrix_get_col(r1,M_,i);
+					gsl_matrix_get_col(r2,M_,j);
+				} else {
+					gsl_matrix_get_col(r1,C_,i);
+					gsl_matrix_get_col(r2,C_,j);
+				}
 				gsl_vector_sub(r1,r2);
 				ftyp len = gsl_blas_dnrm2(r1);
 				gsl_matrix_set( A_, i, j, len );
@@ -342,7 +368,6 @@ cluster::calc_distance_matrix(void) {
 		}
 		ftyp n   = A_->size2;
 		maxbond_ = X/n+sqrt( (X2-X*X/n)/n );
-
 		return 0;
 	}else{
 		std::cout << "ERROR::PARTICLE SETS NOT ASSIGNED" << std::endl;
@@ -511,6 +536,45 @@ particle_analysis::find_via_distance( gmat *A, ftyp level ) {
 	return is_tmp;
 }
 
+cluster::cluster(particles m, particles c){
+	int D1=m.size(),D2=c.size();
+	alloc_space( D1 , D2 );
+
+	for(int i=0;i<D1; i++) {
+			gsl_matrix_set_col ( M_ , i, m[i].second ) ;
+	}
+	for(int i=0;i<D2; i++) {
+			gsl_matrix_set_col ( C_ , i, c[i].second ) ;
+			centroid_names_.push_back(c[i].first);
+	}
+	gsl_kmeans0( M_ , vc_ , C_ , wc_ );
+}
+
+void
+cluster::print_centroids( std::string filename ){
+		int N = C_->size2;
+		particles ps;
+		for(int i=0 ; i<N ; i++ ) {
+			gvec	*w = gsl_vector_alloc(DIM);
+			gsl_matrix_get_col(w,C_,i);
+			particle p;
+			if(centroid_names_.size()==C_->size2) {
+				std::string label	=	centroid_names_[i];
+				p.first			=	label;
+			}
+			else {
+				std::string label	=	"C" ;
+				p.first			=	label;
+			}
+			p.second		= 	gsl_vector_alloc(DIM);
+			gsl_vector_memcpy(p.second,w);
+			ps.push_back(p);
+			gsl_vector_free(w);
+		}
+		richanalysis::fileIO fIO;
+		fIO.output_pdb( filename , ps );
+}
+
 
 void
 cluster::alloc_space( int D1, int D2 ) {
@@ -544,7 +608,7 @@ cluster::realloc_centroids( int D2 ) {
 int 
 cluster::set_matrix( particles coord_space ) {
 	int D		= coord_space.size();
-	int reval	=	-1;
+	int reval	= -1;
 
 	int rD = get_cDIM(); 
 
@@ -874,9 +938,12 @@ cluster::calculate_nn_and_contacts(void)
 {
 	int verbose 	= 0 ;
 
-	calc_distance_matrix();
+	calc_distance_matrix(0);
 	gmat *D		= gsl_matrix_calloc( length_M(), length_M() );
 	gvec *v		= gsl_vector_calloc( length_M() );
+//
+	//HERE NOW
+//
 	copyv(v);
 	copyA(D);
 
@@ -1094,6 +1161,18 @@ cluster::get_model( void ){
 	richanalysis::coord_format cfp;
 	if( bSet_ ) {
 		particles red_parts = cfp.mat2par( M_ , vc_ );
+		return red_parts;
+	} else {
+		particles red_parts;
+		return red_parts;
+	}
+}
+
+particles
+cluster::get_centroids( void ) {
+	richanalysis::coord_format cfp;
+	if( bSet_ ) {
+		particles red_parts = cfp.mat2par( C_ , wc_ );
 		return red_parts;
 	} else {
 		particles red_parts;
@@ -1682,6 +1761,88 @@ clustering::gsl_seeded_kmeans(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *
 			gsl_vector_set(counts,i,0);
 			for (j = XX; j <= ZZ; j++){
 				gsl_matrix_set(tmp_ce,j,i,0.0);
+			}
+ 		}
+		for (h = 0; h < NN; h++) {
+			ftyp min_distance = 1E30;
+			for (i = 0; i < KK; i++) {
+				ftyp distance = 0;
+				for ( j = XX; j<=ZZ ; j++ ) {
+					distance += square( gsl_matrix_get( dat,j,h ) - gsl_matrix_get( cent,j,i ) );
+				}
+				if (distance < min_distance) {
+	 				gsl_vector_set(labels,h,i); min_distance = distance; 
+				} 
+			} 
+			for ( j=XX ; j<=ZZ ; j++ ){
+ 				gsl_matrix_set( tmp_ce, j, gsl_vector_get(labels,h),
+				 gsl_matrix_get( dat, j, h ) + gsl_matrix_get(tmp_ce, j, gsl_vector_get(labels,h)) );
+			}
+			gsl_vector_set(counts,gsl_vector_get(labels,h),1.0+gsl_vector_get(counts,gsl_vector_get(labels,h)));
+	 		error += min_distance; 
+		}
+	 	for (i = 0; i < KK; i++) {
+	 		for ( j=XX ; j<=ZZ ; j++ ) {
+				gsl_matrix_set(cent,j,i,
+				gsl_vector_get(counts,i)?(gsl_matrix_get(tmp_ce,j,i)/gsl_vector_get(counts,i)):(gsl_matrix_get(tmp_ce,j,i)));
+	 		}
+	 	}
+	} while ( fabs(error - old_error) > TOL );	// WHILE THEY ARE MOVING
+
+	ftyp wi=0.0, nwh=0.0;
+	for( i=0 ; i<NN ; i++) {
+		h 	= gsl_vector_get(labels,i);
+		wi	= gsl_vector_get(w,i);
+		nwh	= gsl_vector_get(nw,h);
+		gsl_vector_set(w,i,h);		// MIGHT NOT WANT TO OVERWRITE THIS
+		gsl_vector_set(nw,h,nwh+wi); 		// NOT NORMALIZED HERE
+	}
+
+	gsl_vector_free(labels); 
+	gsl_vector_free(counts);
+	gsl_matrix_free(tmp_ce);
+
+	return 0;
+}
+
+
+int 
+clustering::gsl_kmeans0(gmat *dat, gsl_vector *w, gmat *cent, gsl_vector *nw ){
+	int NN=dat->size2, MM=dat->size1, KK=cent->size2;
+
+	gvec *labels = gsl_vector_calloc(NN);
+	gvec *counts = gsl_vector_calloc(KK);
+	gmat *tmp_ce = gsl_matrix_calloc(MM,KK);
+
+	if( ((int)cent->size1)!=MM || !gsl_vector_isnonneg(w) || ((int)w->size)!=NN || ((int)nw->size)!=KK )	{
+		std::cout << "ERROR::BAD::KMEANS" << std::endl;
+		return -1;
+	}
+	gsl_vector_set_zero(nw);
+	gsl_vector_set_zero(w);
+
+	int h, i, j;
+	ftyp old_error, error = 1E30, TOL=1E-10; 
+/*
+ *	std::vector<int> myvector;
+ *	for ( i=0; i<NN; ++i ) myvector.push_back(i); 
+ *	int steps = 1+NN%2;
+ *	for ( i=0; i < steps ; i++ )
+ *		random_shuffle ( myvector.begin(), myvector.end() );
+ *	i=0;
+ *	for ( h=0 ; h<KK ; h++ ){
+ *		for ( j=XX ; j<=ZZ ; j++ ) { 
+ *			gsl_matrix_set( cent, j, h , gsl_matrix_get( dat, j, myvector[h] ) );
+ *		} 
+ *	}
+ */
+
+	do {
+		old_error = error, error = 0; 
+		for (i = 0; i < KK; i++ ) {
+			gsl_vector_set( counts, i, 0 );
+			for (j = XX; j <= ZZ; j++){
+				gsl_matrix_set( tmp_ce, j, i, 0.0 );
 			}
  		}
 		for (h = 0; h < NN; h++) {

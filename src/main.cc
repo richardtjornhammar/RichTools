@@ -49,7 +49,6 @@ bool nsort_func(std::pair<double, std::pair< int, int > > i1,std::pair<ftyp, std
 	return (i1.first<i2.first);
 };
 
-
 int main (int argc, char **argv) {
 //
 //	ARG PARSING INIT
@@ -78,7 +77,7 @@ int main (int argc, char **argv) {
 	poop.first  = "-oclu";
 	poop.second = "outd.pdb";
 	opts.push_back(poop);
-
+//
 	std::vector<std::string> 	iv_ext;
 	iv_ext.push_back("xyz");
 	std::vector<std::string> 	ov_ext;
@@ -181,7 +180,7 @@ int main (int argc, char **argv) {
 	particles c_aligned = nnode.regular_fit();	// shape fit
 	n0.first .find_centroids();
 	n0.second.find_centroids();
-
+//	
 	std::vector< int > n0flabels = n0.first .get_labels();
 	std::vector< int > n0slabels = n0.second.get_labels();
 // ONLY FOR SHOW
@@ -193,32 +192,40 @@ int main (int argc, char **argv) {
 // E
 	for( int i = 0 ; i < c_aligned.size() ; i++ )
 		c_aligned[i].first = model[i].first; 				// smaller returned
-
 	std::vector<int> ndx12 = nnode.find_centroid_distance_relation(); 	// 2->1 mapping
 	for(int i=0;i<ndx12.size();i++)
 		std::cout << "INDEX PAIR :: \t" << i << " \t "<< ndx12[i] << std::endl;
-
 	for(int i=0;i<n0slabels.size();i++)
 		n0slabels[i] = ndx12[ n0slabels[i] ];
 	n0.first .calculate_neighbors();
 	n0.second.calculate_neighbors();
-
+//	
 // NEW
 	nnode.nn_restraint_fit(0);
 // NEW
-
+//	
 	fIO.output_pdb("nrm" + std::to_string(s)
 			 + opts[2].second , c_aligned
 			, n0slabels ); 
-
 	fIO.output_pdb("nrd" + std::to_string(s)
 			 + opts[3].second , densi 	
 			, n0flabels ); 
-
+//	
+//	HERE USE THE NRM AS INPUT FOR THE NRD CENTROIDS
+	richanalysis::cluster cluless( densi , c_aligned );	//	THIS CONTAINS FRAGMENTED PSEUDO SOLUTION
+	int Ncl=cluless.length_C();
+	cluless.calc_distance_matrix( -1 );
+	cluless.print_centroids("centroids.pdb");
+	// TRY:	ORDINARY ORDERED BEST FIT
+	//	ALGINMENT NOT SHAPE FIT TO THE CENTROIDS
+	particles pcs = cluless.get_centroids();
+	richanalysis::particle_analysis pa;
+	pa.assign_particles( pcs , c_aligned );
+	pa.print_model("realigned.pdb");
+//
 	return 0;
 }
-
-
+//
 //// DEBUG SECTION:: SINGLE PASS
 /*
 	richanalysis::node	n0;
@@ -239,7 +246,6 @@ int main (int argc, char **argv) {
 	return 0;
 */
 ////END DEBUG
-
 /*
 	old_layer.push_back(n0);
 	std::vector<int> clu_ndx,cen_ndx;
