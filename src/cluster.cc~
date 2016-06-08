@@ -71,7 +71,6 @@ bool particle_sort_func(std::pair<ftyp, std::pair< int, int > > i1,std::pair<fty
 	return (i1.first<i2.first);
 };
 
-
 particles
 particle_analysis::assign_via_distmatrix( gmat *A ) {
 
@@ -252,7 +251,7 @@ void
 particle_analysis::assign_matrices(void) {
 	std::vector< std::pair<ftyp, std::pair< int, int > > > vi;
 	rel_idx_.clear();
-
+	
 	if( complete() ) {
 		int N		= model_.size();
 		A_		= gsl_matrix_calloc(model_.size(),model_.size());
@@ -264,9 +263,11 @@ particle_analysis::assign_matrices(void) {
 		wc_		= gsl_vector_calloc(model_.size());
 		gvec *r		= gsl_vector_calloc( DIM );
 		gvec *rc	= gsl_vector_calloc( DIM );
-
+		cen_m_		= gsl_vector_calloc( DIM );
+		cen_d_		= gsl_vector_calloc( DIM );
+		rc	= gsl_vector_calloc( DIM );
 		// IF SAME SIZE THEN DONT CLUSTER
-		if( !( density_size() == model_.size() ) ){
+		if( !( density_.size() == model_.size() ) ){
 			for(int i=0;i<density_.size();i++) { 
 				gsl_vector_memcpy( r , density_[i].second ); 
 				gsl_matrix_set_col(M_, i, r);
@@ -276,18 +277,20 @@ particle_analysis::assign_matrices(void) {
 			gsl_matrix_memcpy( C_ , M_  );
 			gsl_vector_memcpy( wc_, vc_ );
 		}
+		
 		// REGULAR ALIGNMENT TO
 		richanalysis::fitting rfit;
 		U_ 	= gsl_matrix_calloc( DIM , DIM );
 		t_ 	= gsl_vector_calloc( DIM );
 		float diff	= rfit.kabsch_fit( P_ , C_ , U_ , t_ );
 		bHaveUt_	= true;
+		
 		rfit.apply_fit	( model_ , U_ , t_ );
 
 		for(int i=0;i<N;i++) {
 			double min_d = 1e10;
 			gsl_vector_memcpy( r , model_[i].second ); 
-			// gsl_matrix_set_col(P_, i, r);
+			// gsl_matrix_set_col( P_, i, r );
 			for( int j=0; j<N; j++ ) {
 				gsl_vector_memcpy 	( r , model_[i].second ); 
 				gsl_matrix_get_col	( rc, C_ , j ); 
@@ -330,32 +333,134 @@ particle_analysis::assign_matrices(void) {
 */
 }
 
+int 			
+particle_analysis::calc_distance_matrix( gmat *D, particles p ){
+	if( D->size1==p.size() && D->size1==D->size2 ) {
+		gvec *r1	= gsl_vector_calloc( DIM );
+		gvec *r2	= gsl_vector_calloc( DIM );
+		for( int i=0 ; i<p.size() ; i++ ) {
+			gsl_vector_memcpy( r1 , p[i].second ); 
+			for( int j=0 ; j<p.size() ; j++ ) {
+				gsl_vector_memcpy( r2 , p[j].second );
+				gsl_vector_sub(r2,r1);
+				ftyp len = gsl_blas_dnrm2(r2);
+				gsl_matrix_set( D, i, j, len );
+			}
+		}
+		gsl_vector_free(r1);
+		gsl_vector_free(r2);
+	} else {
+		std::cout << "DIMENSION ERROR" << std::endl;
+	}
+	return 0;
+}
+
+void
+particle_analysis::remove_centroids() {
+	if( model_.size()>0 && density_.size()>0 ) {
+		gsl_vector *rs = gsl_vector_calloc(DIM);
+		gsl_vector *rc = gsl_vector_calloc(DIM);
+		gsl_vector *rm = gsl_vector_calloc(DIM);
+		gsl_vector *rd = gsl_vector_calloc(DIM);
+
+		for( int i=0 ; i<model_.size() ; i++ ) {
+			gsl_vector_memcpy	(rm , model_[i].second);
+			gsl_vector_scale	(rm , 1.0/model_.size());
+			gsl_vector_add		(rs , rm);
+		}
+		for( int i=0 ; i<model_.size() ; i++ ) 
+			gsl_vector_sub( model_[i].second	, rs );
+
+		for( int i=0 ; i<density_.size() ; i++ ) {
+			gsl_vector_memcpy	(rd , density_[i].second);
+			gsl_vector_scale	(rd , 1.0/density_.size());
+			gsl_vector_add		(rc , rd);
+		}
+		for( int i=0 ; i<density_.size() ; i++ ) 
+			gsl_vector_sub( density_[i].second	, rc );
+
+		gsl_vector_memcpy( cen_m_ , rs );
+		gsl_vector_memcpy( cen_d_ , rc );
+	}else{
+		std::cout << "AINT DOING JACK" << std::endl;
+	}
+}
+
+void
+particle_analysis::density_model_hybrid( particles pd , particles pm ) {
+	if( pd.size() == pm.size() ) {
+		gsl_matrix *D0 = gsl_matrix_calloc(pm.size(),pm.size());
+		gsl_matrix *D1 = gsl_matrix_calloc(pm.size(),pm.size());
+		gsl_matrix *D2 = gsl_matrix_calloc(pm.size(),pm.size());
+		copyA(D0);
+		gsl_vector *rm = gsl_vector_calloc(DIM);
+ 		gsl_vector *rd = gsl_vector_calloc(DIM);
+		calc_distance_matrix( D1 , pd );
+		ftyp cutoff = 3.0;
+		for(int ISWEEP=0 ; ISWEEP<1000 ; ISWEEP++ ) {
+			for( int i=0 ; i<pm.size() ; i++ ) {
+				ftyp len_match	= 1.0E6;
+				int	ikeep	= 0;
+				for( int j=0 ; j<pd.size() ; j++ ) {
+					gsl_vector_memcpy( rm , pm[i].second );
+					gsl_vector_memcpy( rd , pd[j].second );
+					gsl_vector_sub	 ( rd , rm  );
+					ftyp len = gsl_blas_dnrm2(rd);
+					if( len < len_match ) {
+						ikeep = j;
+						len_match = len;
+					}
+				}
+				ftyp summ=0.0, sumd=0.0;
+				for( int k=0 ; k<pm.size() ; k++ ){
+					ftyp c1  = gsl_matrix_get(D0,i,k);
+					ftyp c2  = gsl_matrix_get(D1,ikeep,k);
+					summ	+= (c1<cutoff?c1:cutoff) ;
+					sumd	+= (c2<cutoff?c2:cutoff) ;
+				}
+				gsl_vector_memcpy( rm , pm[  i  ].second );
+				gsl_vector_memcpy( rd , pd[ikeep].second );
+				ftyp delta = 		abs(summ-sumd);
+				gsl_vector_scale	( rd , 5.0E-4*exp(-delta) ); //exp(-delta*1.0E-8) );// exp(-delta)
+				gsl_vector_add		( rm , rd );
+				gsl_vector_memcpy	( pm[i].second , rm );
+			}
+		}
+		gsl_vector_free(rm);	gsl_vector_free(rd);
+		gsl_matrix_free(D0);	gsl_matrix_free(D1);
+	} else {
+		std::cout << "CANNOT CREATE HYBRID MODEL" << std::endl;
+	}
+
+	for( int i=0 ; i<pm.size() ; i++ ) {
+		gsl_vector_memcpy( model_[i].second , pm[i].second); 
+	}
+}
+
 int 
 cluster::calc_distance_matrix(int i) {
-
 	if( isSet() ) {
-		if(	A_	) 
-			gsl_matrix_free(A_);
+		//if( A_!=NULL  ) 
+		//	gsl_matrix_free(A_);
+
+		int D	= ( i>=0 ) ? (M_->size2) : (C_->size2);
+		A_ 	= gsl_matrix_calloc( D, D );
+		gsl_matrix *MAT = gsl_matrix_calloc( DIM , D );
+
 		if(i>=0)
-			A_  = gsl_matrix_alloc( M_->size2, M_->size2 );
+			gsl_matrix_memcpy( MAT , M_ );
 		else
-			A_  = gsl_matrix_alloc( C_->size2, C_->size2 );
+			gsl_matrix_memcpy( MAT , C_ );
 
-		gvec *r1 = gsl_vector_alloc( DIM );
-		gvec *r2 = gsl_vector_alloc( DIM );
+		gvec *r1 = gsl_vector_calloc( DIM );
+		gvec *r2 = gsl_vector_calloc( DIM );
 
-		int D = A_->size2;
 		ftyp xmin, x2min, X, X2;
 		for(int i=0;i<D; i++){
 			xmin=1E10;
 			for(int j=0;j<D;j++){
-				if( i>=0 ) {
-					gsl_matrix_get_col(r1,M_,i);
-					gsl_matrix_get_col(r2,M_,j);
-				} else {
-					gsl_matrix_get_col(r1,C_,i);
-					gsl_matrix_get_col(r2,C_,j);
-				}
+				gsl_matrix_get_col(r1,MAT,i);
+				gsl_matrix_get_col(r2,MAT,j);
 				gsl_vector_sub(r1,r2);
 				ftyp len = gsl_blas_dnrm2(r1);
 				gsl_matrix_set( A_, i, j, len );

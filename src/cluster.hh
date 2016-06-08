@@ -130,6 +130,7 @@ namespace richanalysis {
 		private:
 			gmat	*M_; 		// 0 THE ORIGINAL COORDINATES 
 			gmat	*C_; 		// 1 THE CENTROIDS
+			gmat 	*A_;
 			gvec	*vc_;		// 0 UNSORTED LABELS
 			gvec	*wc_;		// 1 UNSORTED LABELS		
 			gvec	*ws_;		// 1 SORTED SIGMAS (DATA -> CENTROID+SIGMA) STORED ON wc_ LABEL
@@ -141,7 +142,6 @@ namespace richanalysis {
 			int	rDIM_; 
 			bool bHaveNN_;
 //	FOR SETS WITH SMALL N (MODEL) AN ALTERNATIVE IS DISTANCE MATRICES
-			gmat 	*A_;
 			ftyp maxbond_;
 	};
 	
@@ -210,6 +210,7 @@ namespace richanalysis {
 			particle_analysis( ) {	bAssigned_	= false; bMatrices_	= false; 
 						bSingleSet_	= false; bHaveUt_	= false;   };
 			int 			calc_distance_matrices(void);
+			int 			calc_distance_matrix( gmat *D, particles p );
 			std::vector< int >	find_via_distance	( gmat *A, ftyp level );
 			std::vector< int > 	outp_distance_matrix	( gmat *A, ftyp level );
 			std::vector< int > 	outp_distance_matrix	( ftyp level ) { 
@@ -217,10 +218,11 @@ namespace richanalysis {
 			std::vector< std::pair<ftyp, std::pair< int, int > > >	compare_dist_matrices(gmat *A, gmat *B, ftyp val);
 			std::vector< std::pair<ftyp, std::pair< int, int > > >	compare_dist_matrices(ftyp val) { 
 						 return compare_dist_matrices(A_, B_, val); };
+			void		remove_centroids(void);
 			particles	assign_via_distmatrix( gmat *A );
 			particles	assign_via_distmatrix( gmat *A , gvec *b);
 			void		assign_particles( particles pd, particles pm )	{
-				if( pd.size() > pm.size() ) {
+				if( pd.size() >= pm.size() ) {
 					density_.clear(); density_.insert( density_.end() , pd.begin() , pd.end() );
 					model_.clear(); model_.insert( model_.end() , pm.begin() , pm.end() );
 				} else {
@@ -240,7 +242,11 @@ namespace richanalysis {
 			void		copyC(gmat *C0) { 
 						if(C0->size1==C_->size1&&C0->size2==C_->size2) { gsl_matrix_memcpy(C0, C_); } 
 					};
+			void		copyA(gmat *A0) { 
+						if(A0->size1==A_->size1&&A0->size2==A_->size2) { gsl_matrix_memcpy(A0, A_); } 
+					};
 			particles		output_reduced_density(void);
+			void		density_model_hybrid( particles , particles );
 		private:
 			bool bAssigned_, bMatrices_, bSingleSet_, bHaveUt_;
 			particles density_;
@@ -253,6 +259,7 @@ namespace richanalysis {
 			gvec	*wc_;		// 1 UNSORTED LABELS
 			gmat	*U_;
 			gvec	*t_;
+			gvec	*cen_m_,*cen_d_;
 			std::vector< std::pair<ftyp, std::pair< int, int > > > relation_;
 	};
 }

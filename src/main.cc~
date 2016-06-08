@@ -212,15 +212,21 @@ int main (int argc, char **argv) {
 			, n0flabels ); 
 //	
 //	HERE USE THE NRM AS INPUT FOR THE NRD CENTROIDS
+//
 	richanalysis::cluster cluless( densi , c_aligned );	//	THIS CONTAINS FRAGMENTED PSEUDO SOLUTION
-	int Ncl=cluless.length_C();
+	int Ncl = cluless.length_C();
+
 	cluless.calc_distance_matrix( -1 );
+
 	cluless.print_centroids("centroids.pdb");
 	// TRY:	ORDINARY ORDERED BEST FIT
 	//	ALGINMENT NOT SHAPE FIT TO THE CENTROIDS
-	richanalysis::particles pcs = cluless.get_centroids();
+
+	particles pcs = cluless.get_centroids();
 	richanalysis::particle_analysis pa;
 	pa.assign_particles( pcs , c_aligned );
+	pa.remove_centroids();
+	pa.density_model_hybrid( pcs, c_aligned );
 	pa.print_model("realigned.pdb");
 //
 	return 0;
