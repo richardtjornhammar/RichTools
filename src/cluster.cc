@@ -248,6 +248,14 @@ particle_analysis::print_model( std::string filename ) {
 }
 
 void
+particle_analysis::print_density( std::string filename ) {
+		if( bAssigned_ ) {
+			richanalysis::fileIO fIO;
+			fIO.output_pdb( filename , density_ );
+		}
+}
+
+void
 particle_analysis::assign_matrices(void) {
 	std::vector< std::pair<ftyp, std::pair< int, int > > > vi;
 	rel_idx_.clear();
@@ -387,7 +395,11 @@ particle_analysis::remove_centroids() {
 }
 
 void
-particle_analysis::density_model_hybrid( particles pd , particles pm ) {
+particle_analysis::density_model_integer_run( particles pd , particles pm ) 
+{
+	std::mt19937 generator(1871865);
+	std::uniform_real_distribution<double> distribution(0.0,1.0);
+	double dice_roll = distribution(generator);
 	if( pd.size() == pm.size() ) {
 		gsl_matrix *D0 = gsl_matrix_calloc(pm.size(),pm.size());
 		gsl_matrix *D1 = gsl_matrix_calloc(pm.size(),pm.size());
@@ -395,39 +407,168 @@ particle_analysis::density_model_hybrid( particles pd , particles pm ) {
 		copyA(D0);
 		gsl_vector *rm = gsl_vector_calloc(DIM);
  		gsl_vector *rd = gsl_vector_calloc(DIM);
-		calc_distance_matrix( D1 , pd );
-		ftyp cutoff = 3.0;
-		for(int ISWEEP=0 ; ISWEEP<1000 ; ISWEEP++ ) {
+		gsl_vector *rk = gsl_vector_calloc(DIM);
+		gsl_vector *rr = gsl_vector_calloc(DIM);
+
+		calc_distance_matrix( D1 , pd ); 
+		calc_distance_matrix( D2 , pm );
+
+		ftyp beta	= 1.0E-4;
+
+		int N = (int)( pd.size() );
+		gsl_vector *d1i = gsl_vector_calloc(N);
+		gsl_vector *d0i = gsl_vector_calloc(N);
+		gsl_vector *d1j = gsl_vector_calloc(N);
+		gsl_vector *d0j = gsl_vector_calloc(N);
+		int nsw=1e3;
+		for(int isw=0;isw<nsw;isw++)
+		{
+			beta += 1E-4*((float)isw/nsw);
+			int I = (int)(distribution(generator)*(pd.size()-1.0) );
+			int J = (int)(distribution(generator)*(pd.size()-1.0) );
+			J = (I==J)?(I+1)>=N?(0):(I+1):(J);
+			//std::cout << "INFO:: " << I << " " << J << " " << N << std::endl;
+			particle ptmp=pd[I];
+			pd[I]=pd[J];pd[J]=ptmp;
+			calc_distance_matrix( 	D1 , pd 	);
+			gsl_matrix_get_row(d1i , D1 , I);
+			gsl_matrix_get_row(d0i , D0 , I);
+			gsl_matrix_get_row(d1j , D1 , J);
+			gsl_matrix_get_row(d0j , D0 , J);	
+
+			gsl_vector_sub	 ( d1i , d0i  );
+			gsl_vector_sub	 ( d1j , d0j  );
+			ftyp lenj = gsl_blas_dnrm2( d1j );
+			ftyp leni = gsl_blas_dnrm2( d1i );
+			leni*=leni;
+			lenj*=lenj;
+			
+			if(distribution(generator)>exp(-beta*(leni + lenj) )){
+				particle ptmp=pd[I];
+				pd[I]=pd[J];pd[J]=ptmp;		
+			}
+		}
+		std::cout << "DONE" << std::endl;
+
+		gsl_vector_free(d1i);
+		gsl_vector_free(d0i);
+		gsl_vector_free(d0j);
+		gsl_vector_free(d1j);
+		gsl_vector_free(rm);	gsl_vector_free(rd);
+		gsl_vector_free(rk);	gsl_vector_free(rr);
+		gsl_matrix_free(D0);	gsl_matrix_free(D1);
+
+		for(int i=0;i<pd.size();i++) {
+			pd[i].first=pm[i].first;
+			density_[i]=pd[i];
+		}
+		
+	}	
+}
+
+void
+particle_analysis::density_model_hybrid( particles pd , particles pm ) 
+{
+
+	std::mt19937 generator(1871865);
+	std::uniform_real_distribution<double> distribution(0.0,1.0);
+	double dice_roll = distribution(generator);
+
+//  HOW TO ROLL THE DICE
+//  dice_roll = distribution(generator);
+
+	if( pd.size() == pm.size() ) {
+		gsl_matrix *D0 = gsl_matrix_calloc(pm.size(),pm.size());
+		gsl_matrix *D1 = gsl_matrix_calloc(pm.size(),pm.size());
+		gsl_matrix *D2 = gsl_matrix_calloc(pm.size(),pm.size());
+		copyA(D0);
+		gsl_vector *rm = gsl_vector_calloc(DIM);
+ 		gsl_vector *rd = gsl_vector_calloc(DIM);
+		gsl_vector *rk = gsl_vector_calloc(DIM);
+		gsl_vector *rr = gsl_vector_calloc(DIM);
+
+		calc_distance_matrix( D1 , pd ); 
+		ftyp cutoff 	= 5.0;
+		ftyp dr 	= 5.0E-1;
+		ftyp beta	= 1.0E-3;
+		int NSWEEPS	= 1E4;
+		for( int ISWEEP=0 ; ISWEEP<NSWEEPS ; ISWEEP++ ) {
+			ftyp fsweep	= ISWEEP/((float)NSWEEPS);
+			ftyp s2m	= cutoff*cutoff;
+			ftyp invgau_m	= 1.0/sqrt(2*s2m*M_PI);
+			ftyp s2d	= cutoff*cutoff*2.0*2.0; 
+			ftyp invgau_d	= 1.0/sqrt(2*s2d*M_PI);
+
+			// FINDS NEAREST CENTROIDS ( CAN BE DEGENERATE )
 			for( int i=0 ; i<pm.size() ; i++ ) {
 				ftyp len_match	= 1.0E6;
 				int	ikeep	= 0;
+				gsl_vector_memcpy( rm , pm[i].second );
 				for( int j=0 ; j<pd.size() ; j++ ) {
-					gsl_vector_memcpy( rm , pm[i].second );
 					gsl_vector_memcpy( rd , pd[j].second );
 					gsl_vector_sub	 ( rd , rm  );
 					ftyp len = gsl_blas_dnrm2(rd);
 					if( len < len_match ) {
 						ikeep = j;
-						len_match = len;
+						len_match	= len;
+						ftyp ds		= dr>len?dr:len;	
+						gsl_vector_memcpy( rk , rd );
+						gsl_vector_set	(  rr , XX , (2.0*distribution(generator)-1.0)*ds );
+						gsl_vector_set	(  rr , YY , (2.0*distribution(generator)-1.0)*ds );
+						gsl_vector_set	(  rr , ZZ , (2.0*distribution(generator)-1.0)*ds );
+						gsl_vector_add  (  rk , rr );
 					}
 				}
-//			calc_distance_matrix( D2 , pm );
-				ftyp summ=0.0, sumd=0.0;
-				for( int k=0 ; k<pm.size() ; k++ ){
+				gsl_vector_add  (  rk , rm );
+				ftyp sum0 = 0.0, sum1 = 0.0, sum2=0.0;
+				for( int k=0 ; k<pm.size() ; k++ ) { // SELF ENERGY
+					if( k!=i ) { 
+						gsl_vector_memcpy ( rm , pm[k].second );
+						gsl_vector_sub	  ( rm , rk );
+						ftyp len0	= gsl_blas_dnrm2(rm); // CORRESPONDS TO ONE ROW OF D0
+						ftyp ilen0	= 1.0/len0;
+						ftyp d0		= gsl_matrix_get(D0,i,k);
+						len0 -= d0; len0 *= len0;
+						sum0 -= exp(-len0*0.5/s2m )/d0/d0/d0; 
+					}
+				}
+				sum0*=(fsweep+1.0)*4.0;
+				for( int k=0 ; k<pd.size() ; k++ ) {
+					gsl_vector_memcpy ( rm , pd[k].second );
+					gsl_vector_memcpy ( rr , pd[k].second );
+					gsl_vector_sub	  ( rr , pm[k].second );
+					gsl_vector_sub	  ( rm , rk );
+					ftyp len1 = gsl_blas_dnrm2(rm);
+					ftyp len2 = gsl_blas_dnrm2(rr);
+					len1 *= len1; len2 *= len2;
+					sum1-=exp(-len1*0.5/s2d )*invgau_d; 
+					sum2-=exp(-len2*0.5/s2d )*invgau_d; 
+				}
+				ftyp x	 = (1.05-fsweep);
+				sum1	*= x*x;
+				sum2	*= x*x;
+				if( distribution(generator) <= exp( -1.0*( (sum1+sum0) - sum2) )*beta )
+					gsl_vector_memcpy	( pm[i].second , rk );
+/*
+				ftyp summ = 0.0, sumd = 0.0;
+				for( int k=0 ; k<pm.size() ; k++ ) {
 					ftyp c1  = gsl_matrix_get(D0,i,k);
 					ftyp c2  = gsl_matrix_get(D1,ikeep,k);
 					summ	+= (c1<cutoff?c1:cutoff) ;
 					sumd	+= (c2<cutoff?c2:cutoff) ;
 				}
+
 				gsl_vector_memcpy( rm , pm[  i  ].second );
 				gsl_vector_memcpy( rd , pd[ikeep].second );
-				ftyp delta = 		abs(summ-sumd);
+				ftyp delta 	 = abs(summ-sumd);
 				gsl_vector_scale	( rd , 5.0E-4*exp(-delta) ); //exp(-delta*1.0E-8) );// exp(-delta)
 				gsl_vector_add		( rm , rd );
-				gsl_vector_memcpy	( pm[i].second , rm );
+*/
+
 			}
 		}
 		gsl_vector_free(rm);	gsl_vector_free(rd);
+		gsl_vector_free(rk);	gsl_vector_free(rr);
 		gsl_matrix_free(D0);	gsl_matrix_free(D1);
 	} else {
 		std::cout << "CANNOT CREATE HYBRID MODEL" << std::endl;
@@ -524,6 +665,45 @@ particle_analysis::calc_distance_matrices(void) {
 		return 1;
 	}
 }
+
+std::vector<int>
+particle_analysis::outp_distance_matrix( gmat *A ) {
+	int D = A->size1;
+	ftyp level = 1.5;
+	std::vector<int> vi;
+	if( A->size1 == A->size2 ) {
+		std::cout << " A(" << D << "," << D << ")=[" << std::endl; 
+		for(int i=0; i<D; i++){
+			ftyp sum=0,sumb=0;
+			for(int j=0;j<D;j++){
+				ftyp val=gsl_matrix_get(A,i,j);
+				ftyp valb=0;
+				if(level!=0) {
+					if(level>0) {
+						valb=val<level;
+					}else{
+						valb=val>sqrt(level*level);
+					}
+				}
+				if(valb>0)
+					std::cout << "\033[1;31m " << val <<"\033[0m";
+				else
+					std::cout << " " << val ;
+				val*=valb;
+				if(i!=j){
+					sum  += val;
+					sumb +=valb;
+				}
+			}
+			vi.push_back(sumb);
+			std::cout << " | " << sumb << " | " << sum << std::endl;
+		}
+		std::cout << "];" << std::endl;
+	}
+	return vi;
+}
+
+
 
 std::vector<int>
 particle_analysis::outp_distance_matrix( gmat *A, ftyp level ) {

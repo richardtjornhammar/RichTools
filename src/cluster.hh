@@ -213,6 +213,7 @@ namespace richanalysis {
 			int 			calc_distance_matrix( gmat *D, particles p );
 			std::vector< int >	find_via_distance	( gmat *A, ftyp level );
 			std::vector< int > 	outp_distance_matrix	( gmat *A, ftyp level );
+			std::vector< int > 	outp_distance_matrix	( gmat *A );
 			std::vector< int > 	outp_distance_matrix	( ftyp level ) { 
 						return outp_distance_matrix( A_, level ); };
 			std::vector< std::pair<ftyp, std::pair< int, int > > >	compare_dist_matrices(gmat *A, gmat *B, ftyp val);
@@ -239,6 +240,7 @@ namespace richanalysis {
 			bool			single( void )   { return bSingleSet_; };
 			std::vector<int>	return_idx(void) { return rel_idx_   ; };
 			void		print_model(std::string);
+			void		print_density(std::string);
 			void		copyC(gmat *C0) { 
 						if(C0->size1==C_->size1&&C0->size2==C_->size2) { gsl_matrix_memcpy(C0, C_); } 
 					};
@@ -247,6 +249,7 @@ namespace richanalysis {
 					};
 			particles		output_reduced_density(void);
 			void		density_model_hybrid( particles , particles );
+			void		density_model_integer_run( particles , particles );
 		private:
 			bool bAssigned_, bMatrices_, bSingleSet_, bHaveUt_;
 			particles density_;
