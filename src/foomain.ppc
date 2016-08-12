@@ -1,0 +1,1551 @@
+//// C/C++ STUFF
+#include <iostream>
+#include <string>
+#include <fstream>
+#include <vector>
+#include <sstream>
+#include <math.h>
+#include <cstdlib>
+#include <cstring>
+#include <random>
+
+//	MMDB	STUFF
+#include "mmdb/mmdb_manager.h"
+
+//// CLIPPER STUFF
+#include <clipper/clipper.h>
+#include <clipper/clipper-ccp4.h>
+#include <clipper/clipper-contrib.h>
+
+//	GSL	STUFF
+#include <gsl/gsl_matrix.h>
+#include <gsl/gsl_blas.h>
+#include <gsl/gsl_linalg.h>
+#include <gsl/gsl_specfunc.h>
+#include <gsl/gsl_permutation.h>
+#include <gsl/gsl_rng.h>
+#include <gsl/gsl_randist.h>
+
+//	BOOST
+#include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/range/algorithm/sort.hpp>
+
+class residue_info {
+	public:
+		residue_info( ){ bSet_ = false; };
+		std::string get_rname(void){ return rname_; };
+		void	set_rname(std::string rname) {rname_=rname;};
+		char get_shortCode(void){ return shortCode_; };
+		void set_shortCode( char sc ) { shortCode_=sc;};
+		~residue_info(){ };
+	private:
+		bool		 bSet_;
+		std::string	rname_;
+		std::string	chain_, occ_, bfac_, rvec_;
+		int 		 iord_, rsize_;
+		char 		shortCode_;
+};
+
+class residue_props : residue_info {
+	public:
+		residue_props( ){ bSet_ = false; };
+		void alloc_all( int );
+		void dealloc_all();
+		~residue_props(){ if(bSet_){dealloc_all();} };
+	private:
+		bool		 bSet_;
+		double		q_;
+		double		eu1_,eu2_;
+		gsl_vector	*mu_ ,*S_, *t_;
+		gsl_matrix	*theta_;
+		gsl_vector	*sigma_;
+		gsl_matrix	*U_  ,*V_ ;
+		gsl_vector	*occ_,*Bf_;
+		gsl_matrix	*Rall_;
+};
+
+void
+residue_props::alloc_all( int N ) {
+	int D=3;
+	theta_	= gsl_matrix_calloc(D,D);
+	sigma_	= gsl_vector_calloc(D*D*D);
+	U_	= gsl_matrix_calloc(D,N);
+	V_	= gsl_matrix_calloc(D,D);
+	Rall_	= gsl_matrix_calloc(D,N);
+	S_	= gsl_vector_calloc(D);
+	t_	= gsl_vector_calloc(D);
+	mu_	= gsl_vector_calloc(D);
+	Bf_	= gsl_vector_calloc(N);
+	occ_	= gsl_vector_calloc(N);
+}
+
+void
+residue_props::dealloc_all() {
+	gsl_matrix_free( theta_	);
+	gsl_vector_free( sigma_	);
+	gsl_matrix_free( U_	);
+	gsl_matrix_free( V_	);
+	gsl_matrix_free( Rall_	);
+	gsl_vector_free( S_	);
+	gsl_vector_free( t_	);
+	gsl_vector_free( mu_	);
+	gsl_vector_free( Bf_	);
+	gsl_vector_free( occ_	);
+}
+
+void output_matrix( gsl_matrix * );
+//
+//	SIZE OF D IS 10E-11 to 10E-10 m2/s FOR BIOMOLECULES
+//	DIFF EQ:: d/dt(phi) = D d^2/dt^2(phi)	FICKS SECOND
+//
+//	CONS	VALUE				UNIT
+#define KBOL	1.38064889E-23		//	m2 kg s-2 K-1
+#define RGAS	8.31446210		//	J K−1 mol−1
+#define NAVO	6.022140857E23		//
+#define DIM	3
+
+// COMPILE:: g++ -std=c++11 new_main.cc -lmmdb -lgsl -lblas -lclipper-core -lclipper-contrib -lclipper-ccp4 -lclipper-phs -o rich_dyn
+
+std::pair< int , std::vector< std::string > >
+argparser( std::pair < int, char ** > mp, std::vector<int>& v_set, 
+	std::vector < std::pair < int, std::pair<std::string, std::string > > > opts_n_defaults ) {
+
+	// ARGS OUTPUT ORDER CORRESPONDS TO OPTS_N_DEFAULTS FIRST VALUE
+	std::vector< std::string > args;
+	std::pair  < int, std::vector< std::string > > ret_args;
+
+	for( int i=0 ; i<mp.first ; i++ ) {
+		args.push_back			( mp.second[i] );
+	}
+
+	for( int i=0 ; i<opts_n_defaults.size() ; i++ ) {
+		ret_args.second.push_back	( opts_n_defaults[i].second.second );
+		//v_set.push_back(0);
+	}
+
+	// COMMAND INPUT
+	int arg 	= 0 ;
+	ret_args.first 	= 0 ;
+	int a_size = mp.first==1?2:mp.first;
+	int help=0,failed=0;
+	while ( ++arg < a_size  ) {
+		if(  args[arg] == "-h" ||  args[arg] =="--h" || args[arg] =="--help" || args[arg] =="-help" || mp.first==1) {
+			help=1;
+			break;
+		}else{
+			int ia=arg,iap=++arg;
+			for(int i=0;i<opts_n_defaults.size();i++) {
+				if ( args[ia] == opts_n_defaults[i].second.first ) {
+					ret_args.second[i] = args[iap];
+					v_set[i]=1;
+				}
+			}
+		}
+	}
+
+	for(int i=0;i<v_set.size();i++) {
+		if( opts_n_defaults[i].first > 0 && v_set[i] == 0 ) {
+			ret_args.first = 1;
+			failed=1;
+			break;
+		}
+	}
+
+	if ( help==1 || failed==1 ) {
+		std::cout << "HELP:: VIABLE INPUT OPTIONS ARE:\nHELP:: [X] \t OPTION \t VALUE\n" << std::endl;
+		for(int i=0;i<opts_n_defaults.size();i++)
+			std::cout << "HELP:: [" << opts_n_defaults[i].first << "] \t " 
+				<< opts_n_defaults[i].second.first << " \t " 
+				<< ret_args.second[i] << std::endl;
+		ret_args.first = 1;
+		std::cout << std::endl;	
+		if(failed==1) {
+			std::cout << "ERROR::OBLIGATORY ARGUMENTS NOT SET ( MARKED [1] )\n" << std::endl;
+		}
+	}
+
+	return ret_args;
+}
+
+void
+fatal(void){
+	std::string	author("Richard Tjörnhammar (e-mail: richard.tjornhammar@gmail.com)");
+	std::cout << "INFO:: PROGRAM FAILED" << std::endl;
+	std::cout << "PLEASE CONTACT " << author << "\nWITH ANY QUESTIONS REGARDING THE FUNCTIONALITY" << std::endl;
+	exit(1);
+}
+
+void
+fatal( std::string errstr ){
+	std::string	author("Richard Tjörnhammar (e-mail: richard.tjornhammar@gmail.com)");
+	std::cout << "INFO:: PROGRAM FAILED" << std::endl;
+	std::cout << "INFO:: " << errstr << std::endl;
+	std::cout << "PLEASE CONTACT " << author << "\nWITH ANY QUESTIONS REGARDING THE FUNCTIONALITY" << std::endl;
+	exit(1);
+}
+
+void
+die( std::string errstr ){
+	fatal(errstr);
+}
+
+void output_matrix( gsl_matrix *mat) {
+	std::cout << "\n[========================] " << std::endl;
+	for(int i=0;i<mat->size1;i++) {
+		for(int j=0;j<mat->size2;j++) {
+			std::cout << " " << gsl_matrix_get(mat,i,j);
+		}
+		std::cout << "\n";
+	}
+	std::cout << "[========================] " << std::endl;
+}
+
+void calc_cell_matrix( gsl_matrix *cell , CMMDBManager   *mmdb ) {
+	if( !(cell->size1==DIM&&cell->size2==DIM) )
+		fatal();
+	realtype a, b, c, alf, bet, gam, cell_vol;
+	realtype d2r=M_PI/180.0;
+	int ivol;
+	if(mmdb->isCrystInfo()) 
+		mmdb -> GetCell( a , b , c , alf , bet , gam , cell_vol ,ivol );
+	else
+		fatal();
+	std::cout << "GOT CELL: a, b, c, ang1, ang2, ang3 = " 
+		<< a << ", " << b << ", " << c << ", " << alf << ", " << bet << ", " << gam << std::endl;
+	alf*=d2r; bet*=d2r; gam*=d2r;
+
+	gsl_matrix_set(cell,0,0,a);	gsl_matrix_set(cell,1,0, b*cos(gam) 	);	
+	gsl_matrix_set(cell,0,1,0);	gsl_matrix_set(cell,1,1, b*sin(gam)	);
+	gsl_matrix_set(cell,0,2,0);	gsl_matrix_set(cell,1,2, 0 		);
+
+	double c21=c*(cos(alf)-cos(gam)*cos(bet))/sin(gam);
+	gsl_matrix_set(cell, 2, 0, c*cos(bet) 	);
+	gsl_matrix_set(cell, 2, 1, c21 );
+	gsl_matrix_set(cell, 2, 2, sqrt( c*c*(1-cos(bet)*cos(bet)) - c21*c21 ) ); //check
+}
+
+
+void SplitFilename (const std::string& str)
+{
+  std::cout << "Splitting: " << str << '\n';
+  std::size_t found = str.find_last_of("\\/");
+  std::cout << " path: " << str.substr(0,found) << '\n';
+  std::cout << " file: " << str.substr(found+1) << '\n';
+}
+
+std::string SplitString (const std::string& str,const std::string& split_str, int i)
+{
+	std::size_t found = str.find_last_of(split_str);
+	std::string retstr;
+	switch( i ) {
+		case 1:
+			retstr = str.substr(found+1);
+			break;
+		default:
+			retstr = str.substr(0,found);
+	}
+	return retstr;	
+}
+
+
+char
+res_str2chr(std::string reswrd ) { 
+	char resChr='-';
+	int Ncodes		= 43;
+	const char *vs1[]	= {	"---","ala","asn","asp","arg","cys","gln",
+					"glu","gly","his","ile","leu","lys","met",
+					"pro","phe","ser","thr","trp","tyr","val",
+					"unk","ALA","ASN","ASP","ARG","CYS","GLN",
+					"GLU","GLY","HIS","ILE","LEU","LYS","MET",
+					"PRO","PHE","SER","THR","TRP","TYR","VAL",
+					"UNK" };
+	const char *vc1		= "-andrcqeghilkmpfstwyvxANDRCQEGHILKMPFSTWYVX";
+	int j;
+	for( j=0; j<Ncodes ; j++ ) {
+		std::string tmp( vs1[j] );
+		std::size_t found3 = reswrd.find( tmp );
+		if(found3 != std::string::npos) {
+			resChr=vc1[j];
+			break;
+		}
+	}
+	return resChr;
+}
+
+int
+get_sequence(std::string seq_ifi , std::vector<std::string>& vs , int verbose ) {
+	const char *vs1[]	= {	"---","ala","asn","asp","arg","cys","gln",
+					"glu","gly","his","ile","leu","lys","met",
+					"pro","phe","ser","thr","trp","tyr","val",
+					"unk","ALA","ASN","ASP","ARG","CYS","GLN",
+					"GLU","GLY","HIS","ILE","LEU","LYS","MET",
+					"PRO","PHE","SER","THR","TRP","TYR","VAL",
+					"UNK" };
+	int Ncodes		= 43;
+	const char *vc1		= "-andrcqeghilkmpfstwyvxANDRCQEGHILKMPFSTWYVX";
+	std::ifstream inputf;
+	inputf.open(seq_ifi.c_str());
+	if (inputf.is_open()) {
+		std::string line;
+		int rcnt=0;
+		int il=0, ncnt=10, ccnt=0;
+		std::string chn_str;
+		while ( getline ( inputf,line ) ) {
+			std::string search_for("ATOM");
+			std::size_t found = line.find(search_for);
+			if ( found != std::string::npos ) {
+				std::string search_ca("CA");
+				std::size_t found2 = line.find(search_ca);
+				if( found2 == std::string::npos)
+					continue;
+				std::vector< std::string > wrds;
+				boost::split( wrds, line, boost::is_any_of(" ") );
+				int bHit = 0;
+				int I = 0, J = 0;
+				char A = line[21];
+				int ccct = (int) (A-'A') ;
+				for( int i=0; i<wrds.size() ; i++ )  {
+					for(int j=0; j<Ncodes ; j++) {
+						if(bHit==1)
+							continue;
+						std::string tmp(vs1[j]);
+						std::size_t found3 = wrds[i].find(tmp);
+						if(found3 != std::string::npos) {
+							if( (wrds[i].size() >3 && wrds[i][0]=='A')
+							 || (wrds[i].size()==3) ) {
+								bHit=1;
+								I=i;
+								J=j;
+							}
+						}
+					}
+				}
+
+				if( bHit == 1 ) {
+					rcnt++;
+					if( ccct-ccnt==1 ) {
+						ccnt=ccct;
+						il=0;
+						vs.push_back(chn_str);
+						chn_str.clear();
+					}
+					if( il >= ncnt ) {
+						chn_str.append(" ");
+						il=1;
+					} else {
+						il++;
+					}
+					std::stringstream ss;
+					ss << vc1[J];
+					chn_str.append(ss.str());
+				}
+			}
+		}
+		vs.push_back(chn_str);
+                inputf.close();
+//		FINAL IO
+		if( verbose>0 ) {
+			std::cout << "> ; multiplicity=" << 1 << "; \t size=" << rcnt << std::endl;
+			std::cout << std::endl << std::endl <<  "> ; multiplicity=" << 1 << "; \t size=" << rcnt << std::endl;
+			for(int i=0;i<vs.size();i++)
+				std::cout << vs[i] << std::endl << std::endl;
+		}
+	}
+	return 0;
+}
+
+
+clipper::Xmap<float> apply_filter(clipper::Xmap<float> base_map, float filter[3][3][3] ) {
+	clipper::Xmap_base::Map_reference_index midx = base_map.first();
+	clipper::Xmap<float> f_map(base_map);
+	float cnt = 27.0;
+	int I = 1;
+	for(midx = base_map.first(); !midx.last(); midx.next() ) {
+		float vox_ave=0.0;
+		for(int i=-1;i<=1;i++){
+			for(int j=-1;j<=1;j++){
+				for(int k=-1;k<=1;k++){
+					vox_ave	+= filter[i+1][j+1][k+1]*base_map.get_data( midx.index_offset(i,j,k) );
+				}
+			}
+		}
+		float val = vox_ave/cnt;
+		f_map.set_data( midx.index(), val );
+		I++;
+	}
+	return f_map;
+}
+
+clipper::Xmap<float> 
+unsharp_masking(clipper::Xmap<float> base_map ){
+	clipper::Xmap_base::Map_reference_index midx=base_map.first();
+	clipper::Xmap<float> um_map(base_map);
+	int I = 1;
+	for(midx = base_map.first(); !midx.last(); midx.next() ) {
+		float vox_ave=0.0, cnt=0.0;
+		for(int i=-1;i<=1;i++){
+			for(int j=-1;j<=1;j++){
+				for(int k=-1;k<=1;k++){
+					vox_ave	+= base_map.get_data( midx.index_offset(i,j,k) );
+					cnt	+= 1.0;	
+					// std::cout << "INFO:: " << i << ", " << j << ", " << ", " << k << std::endl;
+				}
+			}
+		}
+		float val = base_map.get_data( midx.index() ) - vox_ave/cnt;
+		val	  = val>0?val:0;
+		um_map.set_data( midx.index(), val );
+		I++;
+	}
+	return um_map;
+}
+
+clipper::Xmap<float> 
+blur_map(clipper::Xmap<float> base_map ){ // index offset only works for +-1
+	clipper::Xmap_base::Map_reference_index midx=base_map.first();
+	clipper::Xmap<float> b_map(base_map);
+	int I = 1;
+	for(midx = base_map.first(); !midx.last(); midx.next() ) {
+		float vox_ave=0.0, cnt=0.0;
+		for(int i=-1;i<=1;i++){
+			for(int j=-1;j<=1;j++){
+				for(int k=-1;k<=1;k++){
+					vox_ave	+= base_map.get_data( midx.index_offset(i,j,k) );
+					cnt	+= 1.0;	
+				}
+			}
+		}
+		float val = vox_ave/cnt;
+		val	  = val>0?val:0;
+		b_map.set_data( midx.index(), val );
+		I++;
+	}
+	return b_map;
+}
+
+int sgn(int i){
+	return i>=0?1:-1;
+}
+
+clipper::Xmap<float> 
+sobel_map(clipper::Xmap<float> base_map ){ 
+	clipper::Xmap_base::Map_reference_index midx=base_map.first();
+	clipper::Xmap<float> b_map(base_map);
+	int I = 1;
+	for(midx = base_map.first(); !midx.last(); midx.next() ) {
+		float vox_ave=0.0, cnt=0.0;
+		// ONE FOR EACH  u,v,w
+		float d[3]={1,2,1};
+
+		for(int i=-1;i<=1;i++){
+			for(int j=-1;j<=1;j++){
+				for(int k=-1;k<=1;k++){
+					vox_ave	+= base_map.get_data( midx.index_offset(i,j,k))*d[i+1]*j;
+					vox_ave	+= base_map.get_data( midx.index_offset(i,j,k))*d[j+1]*k;
+					vox_ave	+= base_map.get_data( midx.index_offset(i,j,k))*d[k+1]*i;
+					cnt	+= 3.0;	
+				}
+			}
+		}
+
+		float val = vox_ave/cnt;
+		val	  = val>0?val:0;
+		b_map.set_data( midx.index(), val );
+		I++;
+	}
+	return b_map;
+}
+
+clipper::Xmap<float> 
+random_blur_map(clipper::Xmap<float> base_map ) { 
+	clipper::Xmap_base::Map_reference_index midx=base_map.first();
+	clipper::Xmap<float> b_map(base_map);
+
+//	RANDOM NUMBER GENERATION
+	const gsl_rng_type * T;
+	gsl_rng * r;
+	gsl_rng_env_setup();
+	T = gsl_rng_default;
+	r = gsl_rng_alloc (T);
+
+	for(midx = base_map.first(); !midx.last(); midx.next() ) {
+		float vox_ave = 0.0, cnt = 0.0;
+		for(int i=-1;i<=1;i++) {
+			for(int j=-1;j<=1;j++) {
+				for(int k=-1;k<=1;k++) {
+					float r_val	 = gsl_ran_flat ( r, 0.0, 1.0); // average will be 1/2
+					vox_ave		+= base_map.get_data( midx.index_offset(i,j,k))*r_val;
+					cnt		+= r_val;
+				}
+			}
+		}
+		float val = 2.0*vox_ave/cnt;
+		b_map.set_data( midx.index(), val );
+	}
+
+	gsl_rng_free(r);
+
+	return b_map;
+}
+
+float 
+calc_standardized_moment(clipper::Xmap<float> base_map, int imom , int verbose) {
+	if(verbose>2){
+		std::cout << "DOING MAP STATISTICS, RETURNS STANDARDIZED MOMENT" << std::endl;
+		std::cout << "STARTS AT THE SECOND MOMENT. IMOM=1 IS THE THIRD " << std::endl;
+	}
+	clipper::Xmap_base::Map_reference_index midx=base_map.first();
+	float calc_fs[5]={0.0, 0.0, 0.0, 0.0, 0.0}, e_m, e_s2;
+	for( midx = base_map.first(); !midx.last(); midx.next() ) {
+		calc_fs[0] += base_map[midx] ;
+		calc_fs[1] += base_map[midx]*base_map[midx] ;
+		calc_fs[2] += 1.0;
+	}
+	e_m 		= calc_fs[0]/calc_fs[2];
+	calc_fs[3]	= calc_fs[1]/calc_fs[2];
+	e_s2		= calc_fs[3]-e_m;
+	if(verbose)
+		std::cout << "STAT::" << e_m << std::endl;
+	double cookie = 0.0, nom = 0.0, nam = 0.0;
+	for( midx = base_map.first() ; !midx.last() ; midx.next() ) {
+		double nmomv = (base_map[midx]-e_m)*(base_map[midx]-e_m);
+		for( int im=0 ; im<imom ; im++ )
+			nmomv*=(base_map[midx]-e_m);
+		nom +=  nmomv;
+		nam += (base_map[midx]-e_m)*(base_map[midx]-e_m);
+	}
+	if(verbose>1)
+		std::cout << "STAT:: " << nom << ", " << nam << ", " << calc_fs[2] << std::endl;
+	double	namnam	= calc_fs[2];	
+	nam = pow(nam,imom+2.0);
+	double	om	= sqrt(nam);
+	cookie   	= nom/om*namnam;
+	return cookie;
+}
+
+float calc_map_mean( clipper::Xmap<float> base_map , int bAbs) {
+	float nom=0.0, nam=0.0;
+	for(clipper::Xmap<float>::Map_reference_index midx = base_map.first(); !midx.last(); midx.next() ) {
+		nom += bAbs>0?abs(base_map[midx]):base_map[midx];
+		nam += 1.0;
+	}
+	float e_m=nom/nam;
+	return e_m;
+}
+
+float sum_map( clipper::Xmap<float> base_map , int bAbs) {
+	float sum=0.0;
+	for(clipper::Xmap<float>::Map_reference_index midx = base_map.first(); !midx.last(); midx.next() ) {
+		sum += bAbs>0?abs(base_map[midx]):base_map[midx];
+	}
+	return sum;
+}
+
+clipper::Xmap<float> calc_map_scale( clipper::Xmap<float> map1 , float scale) {
+	clipper::Xmap<float> map3(map1);
+	for(clipper::Xmap<float>::Map_reference_index midx = map1.first(); !midx.last(); midx.next() ) {
+		map3[midx]=map1[midx]*scale;
+	}
+	return map3;
+}
+
+clipper::Xmap<float> calc_map_mult( clipper::Xmap<float> map1 , clipper::Xmap<float> map2) {
+	float nom=0.0, nam=0.0;
+	clipper::Xmap<float> map3(map1);
+	for(clipper::Xmap<float>::Map_reference_index midx = map2.first(); !midx.last(); midx.next() ) {
+		map3[midx]=map1[midx]*map2[midx];
+	}
+	return map3;
+}
+
+std::string conv_f2s (float number){
+    std::ostringstream buff;
+    buff<<number;
+    return buff.str();   
+}
+
+std::vector<float > calc_map_extreme( clipper::Xmap<float> base_map) {
+	float maximum=0.0, minimum=0.0;
+	for(clipper::Xmap<float>::Map_reference_index midx = base_map.first(); !midx.last(); midx.next() ) {
+		maximum=(base_map[midx]>maximum)?(base_map[midx]):(maximum);
+		minimum=(base_map[midx]<minimum)?(base_map[midx]):(minimum);
+	}
+	std::vector<float > extremes;
+	extremes.push_back(maximum);	
+	extremes.push_back(minimum);
+	return extremes;
+}
+
+clipper::Xmap<float> histogram_equalisation( clipper::Xmap<float> map , std::vector<std::pair<float, float[2] > > stats) {
+	clipper::Xmap<float> map_out(map);
+	float lims[2]={stats[0].second[0],stats[0].second[1]}, maximal = lims[0]-lims[1];
+	int   Nb = ((int)stats[0].first);
+	std::cout << "INFO::HE:: "<< lims[0] << " " << lims[1] << " " << Nb << " " << maximal << std::endl;
+
+	for(clipper::Xmap<float>::Map_reference_index midx = map.first(); !midx.last(); midx.next() ) {
+		float val	= map[midx]-lims[1];
+		int I		= ceil( val*stats[0].first/maximal );  
+		I		= ( (I<1)?(1):((I>Nb)?(Nb):(I)) ); 
+		float heval	= stats[I].second[1]*maximal+lims[1];
+		map_out[midx]	= heval;
+	}
+
+	return map_out;
+}
+
+clipper::Xmap<float> stretch_equalisation( clipper::Xmap<float> map ,
+					   std::vector<std::pair<float, float[2] > > stats,
+					   float cutoff1, float cutoff2 ) 
+{
+	clipper::Xmap<float> map_out(map);
+	float lims[2]={stats[0].second[0],stats[0].second[1]}, maximal = lims[0]-lims[1];
+	int   Nb = ((int)stats[0].first);
+	float d=lims[0], c=lims[1], a=0.0, b=0.0;
+	for( int i = 1; i <= Nb ; i++ ){
+		a = (stats[i].second[1]<cutoff1)?(stats[i].second[1]):(a);
+		b = (stats[i].second[1]<cutoff2)?(stats[i].second[1]):(b);
+	}
+	std::cout << "INFO:: HAVE a,b,c,d = " << a << " " << b << " " << c << " " << d << std::endl;
+
+	for(clipper::Xmap<float>::Map_reference_index midx = map.first(); !midx.last(); midx.next() ) {
+		float pout 	= ( map[midx] - c )*( ( b - a )/( d - c ) ) + a ;
+		map_out[midx]	= ( pout>a && pout<b ) ? ( pout ):( 0.0 );
+	}
+
+	return map_out;
+}
+
+clipper::Xmap<float> equalisation( clipper::Xmap<float> map ,
+				std::vector<std::pair<float, float[2] > > stats,
+				int type ) {
+	clipper::Xmap<float> map_out(map);
+	float lims[2]={stats[0].second[0],stats[0].second[1]}, maximal = lims[0]-lims[1];
+	int   Nb = ((int)stats[0].first);
+
+	if( type != 0 && type != 1 ){
+		std::cout << "INFO::ERROR:: "<< lims[0] << " " << lims[1] << " " << Nb << " " << maximal << std::endl;
+		return map;
+	}
+
+	for(clipper::Xmap<float>::Map_reference_index midx = map.first(); !midx.last(); midx.next() ) {
+		float val	= map[midx]-lims[1];
+		int I		= ceil( val*stats[0].first/maximal ); // NOTE: 1->Nb
+		I		= ( (I<1)?(1):((I>Nb)?(Nb):(I)) );
+		float heval	= stats[I].second[type]*val+lims[1]; //stats[I].second[type]*maximal+lims[1];
+		map_out[midx]	= heval;
+	}
+
+	return map_out;
+}
+
+void output_stats(std::vector<std::pair<float, float[2] > > stats, std::string fname) {
+	float lims[2]={stats[0].second[0],stats[0].second[1]}, maximal = lims[0]-lims[1], di=maximal/stats[0].first;
+	int   Nb = ((int)stats[0].first);
+  	std::ofstream ofs;
+  	ofs.open(fname.c_str()); //, std::ofstream::out | std::ofstream::app);
+	for( int i = 1; i <= Nb; i++ ) {
+		ofs << i*di+lims[1] << "\t" << stats[i].second[0] << "\t" << stats[i].second[1] << std::endl;
+	}
+	ofs.close();
+}
+
+std::vector<std::pair<float, float[2] > >
+calc_ideal_peak_cdf( std::vector<std::pair<float, float[2] > > stats, std::string fname ) {
+	float lims[2]={stats[0].second[0],stats[0].second[1]}, maximal = lims[0]-lims[1], di=maximal/stats[0].first;
+	int   Nb	= ((int)stats[0].first);	
+	float dx	= (lims[0] - lims[1])/stats[0].first;
+	float sigma	= stats[Nb+1].second[0], mu = stats[Nb+1].first;
+	float norm	= gsl_sf_erf((stats[Nb].first-mu)/sigma)*2.0, zero = gsl_sf_erf((stats[1].first-mu)/sigma);
+	float diff_val  = 0.0, diff_norm=0.0;
+	for( int i = 1; i <= Nb ; i++ ) {
+		float val = ( gsl_sf_erf((stats[i].first-mu)/sigma)-zero )/norm; 	// AN IDEAL CDF
+		diff_val  = val-stats[i].second[1];					// THE DERIVATIVE (PROBABILITY)
+		stats[i].second[0] = diff_val;
+		diff_norm += stats[i].second[0];
+	}
+
+////	NORMALIZE PRUNED PROBABILITY AND CDF
+	for( int i = 1; i <= Nb ; i++ ) {
+		stats[i].second[0] /= diff_norm*dx;
+		stats[i].second[1]  = 0.0;
+		for( int j=i; j>=1 ; j-- )
+			stats[i].second[1] += stats[j].second[0]*dx;
+	}
+
+////	FILE IO
+  	std::ofstream ofs;
+  	ofs.open(fname.c_str());
+	for( int i = 1; i <= Nb ; i++ )
+		ofs << stats[i].first << "\t" << stats[i].second[0] << "\t" << stats[i].second[1] << std::endl;
+	ofs.close();
+
+	return stats;
+}
+
+int convolve_xmap( clipper::Xmap<float> manip_map )
+{
+	clipper::Skeleton_basic::Neighbours neighb(manip_map);
+	int 	n_neighbs	= neighb.size();
+	float	f_neig		= neighb.size();	
+	float	v, v0; 				
+
+	clipper::Xmap_base::Map_reference_index	ix;
+	clipper::Coord_grid 			c_g;
+	clipper::Coord_grid			c_g_start;
+
+//	BLURRING
+	for (ix = manip_map.first(); !ix.last(); ix.next()) {
+		v0		 = manip_map[ix];
+		c_g_start	 = ix.coord();
+		for (int i=0; i<n_neighbs; i++) {
+			c_g	 = c_g_start + neighb[i];
+			v	+= manip_map.get_data(c_g);
+		}
+		manip_map[ix] += v/f_neig; 
+	}
+
+	return 0;
+}
+
+std::pair<float,float>
+map_mean_variance(clipper::Xmap<float> map, bool bAbs){
+	std::pair< float, float > mv;
+	float X=0.0,X2=0.0,C=0.0;
+	for(clipper::Xmap<float>::Map_reference_index midx = map.first(); !midx.last(); midx.next() ) {
+		float val 	= map[midx];
+		val		= (bAbs)?(sqrt(val*val)):(val);
+		X		+=val;
+		X2		+=val*val;
+		C+=1.0;
+	}
+	X/=C; X2/=C;
+	mv.first=X; mv.second=sqrt(X2-X*X);
+	return mv;
+}
+
+std::vector<std::pair<float, float[2] > >
+calc_cdf(clipper::Xmap<float> map, std::vector<float > lims) {
+	std::vector<float > cdf, prob;
+	float range = lims[0] - lims[1];
+	int Nb = 512;
+//FOR ENTIRE MAPSTATS
+	float mean=0.0, stdev=0.0, X=0.0, X2=0.0, C=0.0;
+//B FOR FWHM CALC
+	float pmax=0.0, hmax=0.0, sh[3]={0.0,0.0,0.0};
+	int   imax=0, ihmax=0;
+//E FFC
+	for(int i=0;i<Nb;i++){
+		cdf.push_back(0.0);
+		prob.push_back(0.0);
+	}
+	float prob_sum=0.0;
+	for(clipper::Xmap<float>::Map_reference_index midx = map.first(); !midx.last(); midx.next() ) {
+		float val 	= map[midx] - lims[1];
+		X		+=map[midx];
+		X2		+=map[midx]*map[midx];
+		C++;
+		int I		= floor( ((float)Nb)*val/range );
+		if( I>=0 && I<Nb ){
+			prob[I]		+= 1.0;
+			prob_sum	+= 1.0;
+		}
+	}
+
+//	OF ENTIRE DISTRIBUTION
+	mean=X/C; X2/=C; stdev=sqrt(X2-X*X);
+	std::cout << "INFO::STAT ::M:: " << mean << " ::S:: " << stdev << " | " << C << std::endl;
+	std::pair<float, float[2] > stat_pack;
+	std::vector<std::pair<float, float[2] > > stats;
+	stat_pack.first 	= ((float)Nb);
+	stat_pack.second[0]	= lims[0];
+	stat_pack.second[1]	= lims[1];
+	//std::cout << "INFO::LIMITS " << lims[0] << " :::: " << lims[1] << std::endl;
+	stats.push_back(stat_pack);
+	for ( int i=0 ; i<Nb ; i++ ) {
+		prob[i]/=prob_sum;
+		for( int j=i; j>=0 ; j-- )
+			cdf[i] += prob[j];
+		stat_pack.first		= i*range/((float)Nb)+lims[1];
+		stat_pack.second[0]	= prob[i]*((float)Nb)/(lims[0]-lims[1]);
+		stat_pack.second[1]	= cdf[i];
+//B FOR FWHM CALC
+		imax  = (stat_pack.second[0]>=pmax)?(i):(imax);
+		sh[0] = (imax==i)?(stat_pack.first):(sh[0]);
+		pmax  = (stat_pack.second[0]>=pmax)?(stat_pack.second[0]):(pmax);
+		hmax  = 0.5*pmax;
+		ihmax = (stat_pack.second[0]>=0.5*pmax)?(i):(ihmax);
+		sh[1] = (ihmax==i)?(stat_pack.first):(sh[1]);
+		hmax  = (stat_pack.second[0]>=0.5*pmax)?(stat_pack.second[0]):(hmax);
+//E FFC
+		stats.push_back(stat_pack);
+  	}
+	for ( int i=1 ; i<=Nb ; i++ ) {
+		if( i<imax ) {
+			sh[1]=(stats[i].second[0]<hmax)?stats[i].first:sh[1];
+		} else {
+			sh[2]=(stats[i].second[0]>hmax)?stats[i].first:sh[2];
+		}
+	}
+
+//// THE PEAK PROPERTIES
+	stat_pack.first		= stats[imax].first; //(sh[2]+sh[1])*0.5;
+	stat_pack.second[0]	= (sh[2]-sh[1])*0.5;
+	stat_pack.second[1]	=  sh[2];
+	stats.push_back(stat_pack);
+
+	return stats;
+}
+
+// REMEMBER
+// g(x)=1/sqrt(2*pi*sigma^2)*exp( -0.5*( (x-mu)^2/sigma^2 ) )
+//
+// integral becomes
+// sqrt(\sigma)*erf( \frac{ x - \mu }{ sqrt(2) \sigma } ) + 2 * \sigma
+
+clipper::Xmap<float> quench_map( clipper::Xmap<float> map0 ) {
+	clipper::Xmap<float> map3(map0);
+	float x = 0.0;
+	for(clipper::Xmap<float>::Map_reference_index midx = map0.first(); !midx.last(); midx.next() ) {
+		x=map0[midx];
+		map3[midx]=x*(tanh((x-0.4)*4.0*M_PI)+1.0)/2.0; // tanh is slightly faster than erf
+	}
+	return map3;
+}
+
+clipper::Xmap<float> degaus( clipper::Xmap<float> I_in, float s1, float s2 , bool full){
+
+	clipper::Xmap<float> I_out(I_in);
+
+	float s1_2 	= s1*s1; 
+	float s2_2 	= s2*s2;
+	float x 	= 0.0;
+
+	if(full){ // THIS METHOD IS REALLY BAD SINCE IT LOOPS OVER EVERYTHING
+		for( clipper::Xmap<float>::Map_reference_index iidx = I_in.first(); !iidx.last(); iidx.next() ) {
+			float val		= 0.0;
+			float cnt		= 0.0;
+			float Ir		= I_in[iidx];
+			clipper::Coord_grid c_r	= iidx.coord();
+			for( clipper::Xmap<float>::Map_reference_index jidx = I_in.first(); !jidx.last(); jidx.next() ) {
+				float Ix		= I_in[jidx];
+				clipper::Coord_grid c_x	= jidx.coord();
+				clipper::Coord_grid c_d; 
+				c_d 		 = c_r - c_x;
+				float du2 	 = c_d.u()*c_d.u() + c_d.v()*c_d.v() + c_d.w()*c_d.w();
+				float dI2 	 = (Ir-Ix)*(Ir-Ix);
+				float w		 = exp(-0.5*du2/s1_2)*exp(-0.5*dI2/s2_2);
+				val		+= w*Ix;
+				cnt		+= w;
+			}
+			I_out[iidx]=val/cnt;
+		}
+	}else{
+		clipper::Skeleton_basic::Neighbours neighb(I_in, 0.1, s1*4.0 );
+		int 	n_neighbs	= neighb.size();
+		float	f_neig		= neighb.size();	
+		float	Ir, Ix; 				
+		float   val		= 0.0;
+		clipper::Xmap_base::Map_reference_index	ix;
+		clipper::Coord_grid 			c_r,c_x,c_d;
+
+		for ( ix = I_in.first(); !ix.last(); ix.next() ) {
+			Ir	 = I_in[ix];
+			c_r	 = ix.coord();
+			val	 = 0.0;
+			float ws	= 0.0;
+			for (int i = 0 ; i<n_neighbs ; i++ ) {
+				c_x	 	 = c_r + neighb[i];
+				c_d	 	 = neighb[i];
+				Ix  	 	 = I_in.get_data(c_x);
+				float du2 	 = c_d.u()*c_d.u() + c_d.v()*c_d.v() + c_d.w()*c_d.w();
+				float dI2 	 = (Ir-Ix)*(Ir-Ix);
+				float w		 = exp(-0.5*du2/s1_2)*exp(-0.5*dI2/s2_2);
+				val		+= w*Ix;
+				ws		+= w;
+				
+			}
+			I_out[ix] = val/ws; 
+		}
+	}
+
+	return I_out;
+}
+
+clipper::Xmap<float> 
+degaus( clipper::Xmap<float> I_in, float s1, float s2 ){
+	clipper::Xmap<float> I_out(I_in);
+
+	float s1_2 	= s1*s1; 
+	float s2_2 	= s2*s2;
+	float x 	= 0.0;
+
+	clipper::Skeleton_basic::Neighbours neighb(I_in, 0.1, s1*4.0 );
+	int 	n_neighbs	= neighb.size();
+	float	f_neig		= neighb.size();	
+	float	Ir, Ix; 				
+	float   val		= 0.0;
+	clipper::Xmap_base::Map_reference_index	ix;
+	clipper::Coord_grid 	c_r,c_x,c_d;
+	for ( ix = I_in.first(); !ix.last(); ix.next() ) {
+		Ir		= I_in[ix];
+		c_r		= ix.coord();
+		val	 	= 0.0;
+		float ws	= 0.0;
+		for (int i = 0 ; i<n_neighbs ; i++ ) {
+			c_x	 	 = c_r + neighb[i];
+			c_d	 	 = neighb[i];
+			Ix  	 	 = I_in.get_data(c_x);
+			float du2 	 = c_d.u()*c_d.u() + c_d.v()*c_d.v() + c_d.w()*c_d.w();
+			float dI2 	 = (Ir-Ix)*(Ir-Ix);
+			float w		 = exp(-0.5*du2/s1_2)*exp(-0.5*dI2/s2_2);
+			val		+= w*Ix;
+			ws		+= w;			
+		}
+		I_out[ix] = val/ws; 
+	}
+
+	return I_out;
+}
+
+clipper::Xmap<float> quench_map_with_cdf( clipper::Xmap<float> map0 ) {
+	clipper::Xmap<float> map3( map0 );
+
+	std::vector<float > lims	= calc_map_extreme( map3 );
+	std::vector<std::pair<float, float[2] > > stats;
+	stats				= calc_cdf( map3 , lims );
+	float maximal	= lims[0]-lims[1];
+	int   Nb 	= ((int)stats[0].first);
+	float ppos	= stats[ stats.size()-1 ].first;
+	float spread	= stats[ stats.size()-1 ].second[0];
+	float hpos	= stats[ stats.size()-1 ].second[1];
+	for (int i=0;i<stats.size()-1;i++) 	// use cdf 0.9% position
+		if( stats[i].second[1] < 0.9 )
+			hpos=stats[i].first;
+ 
+	float x 	= 0.0;
+	float fmap0	= sum_map( map0 , 1 );
+	for( clipper::Xmap<float>::Map_reference_index midx = map0.first(); !midx.last(); midx.next() ) {
+		x		 = map0[midx];					// THE VALUE
+		float val	 = x-lims[1];		
+		int I		 = ceil( val*stats[0].first/maximal ); 
+		I		 = ( (I<1)?(1):((I>Nb)?(Nb):(I)) ); 
+		float cdf_val	 = stats[I].second[1];				// THE CDF
+		map3[midx]	 = x;
+		float s 	 = ( erf((x-hpos)/spread)+1.0 )/2.0; 
+		map3[midx]	*= s;
+	}
+	float fmap3	= sum_map( map3 , 1 );
+	float tot_scale	= fmap0/fmap3;
+ 
+	for( clipper::Xmap<float>::Map_reference_index midx = map0.first(); !midx.last(); midx.next() ) {
+		map3[midx]	*= tot_scale;
+	}
+
+	return map3;
+}
+
+
+clipper::Xmap<float>
+sharpen ( float b_factor, clipper::HKL_data< clipper::datatypes::F_phi<float> > original_fphis ) {
+
+	int n_data = 0;
+	int n_inf  = 0;
+
+	clipper::Grid_sampling gs(	original_fphis.spacegroup(), 
+					original_fphis.cell(), 
+					original_fphis.resolution(), 1.5 );
+	clipper::Xmap<float> xmap;	  					// NULL MAP
+	xmap.init ( original_fphis.spacegroup(), original_fphis.cell(), gs ); 	// INITIALIZE MAP
+
+	clipper::HKL_info::HKL_reference_index hri;
+	clipper::HKL_data< clipper::datatypes::F_phi<float> >	fphis(	original_fphis.spacegroup(),
+									original_fphis.cell(),
+									original_fphis.hkl_sampling()	);
+	fphis = original_fphis;
+	for ( hri = fphis.first(); !hri.last(); hri.next() ) {
+		n_data++;
+		float f = fphis[hri].f();
+		if (! clipper::Util::is_nan(f)) {
+			float irs =  hri.invresolsq();
+			fphis[hri].f() *= exp(-b_factor * irs * 0.25); 
+		}
+		else {
+			n_inf++;
+		}
+	}
+	if( n_inf == n_data )
+		std::cout << "INFO::ERROR" << std::endl; 
+	xmap.fft_from(fphis);
+
+	return xmap;
+
+}
+
+clipper::Xmap<float>
+patterson( clipper::HKL_data< clipper::datatypes::F_phi<float> > original_fphis ) {
+	int n_inf=0,n_data=0,n_own=0;
+	clipper::Grid_sampling gs( original_fphis.spacegroup(), original_fphis.cell(), original_fphis.resolution(), 1.5 );
+	clipper::Xmap<float> xmap;	  					// NULL MAP
+	xmap.init ( original_fphis.spacegroup(), original_fphis.cell(), gs ); 	// INITIALIZE MAP
+	clipper::HKL_info::HKL_reference_index hri;
+	clipper::HKL_data< clipper::datatypes::F_phi<float> >	fphis(	original_fphis.spacegroup(),
+									original_fphis.cell(),
+									original_fphis.hkl_sampling()	);
+	fphis = original_fphis;
+	for ( hri = fphis.first(); !hri.last(); hri.next() ) {
+		n_data++;
+		float f 	= fphis[hri].f();
+		float irs 	= hri.invresolsq();
+		if ( !clipper::Util::is_nan(f) ) {
+			std::cout	<< "  \t  " << f << "  \t  " << irs 
+					<< "\t" << hri.hkl().h() << "\t"<< hri.hkl().k() << "\t"<< hri.hkl().l() 
+					<< std::endl ;n_own++;
+		}
+		if (! clipper::Util::is_nan(f)) {
+			fphis[hri].f() = f*f; 
+			fphis[hri].phi() = 0.0; 
+		}
+		else {
+			n_inf++;
+		}
+	}
+	if( n_inf == n_data )
+		std::cout << "INFO::ERROR" << std::endl; 
+	std::cout << "INFO::COUNT\t" << n_own << std::endl; 
+	xmap.fft_from(fphis);
+	return xmap;
+}
+
+
+clipper::Xmap<float>
+bijvoet_diff( clipper::HKL_data< clipper::datatypes::F_phi<float> > original_fphis ) {
+	int n_inf=0,n_data=0,n_own=0;
+	clipper::Grid_sampling gs( original_fphis.spacegroup(), original_fphis.cell(), original_fphis.resolution(), 1.5 );
+	clipper::Xmap<float> xmap;	  					// NULL MAP
+	xmap.init ( original_fphis.spacegroup(), original_fphis.cell(), gs ); 	// INITIALIZE MAP
+	std::cout << "INFO GOT HERE! " << std::endl;
+	clipper::HKL_info::HKL_reference_index hri;
+	clipper::HKL_data< clipper::datatypes::F_phi<float> >	fphis(	original_fphis.spacegroup(),
+									original_fphis.cell(),
+									original_fphis.hkl_sampling()	);
+	fphis = original_fphis;
+	for ( hri = fphis.first(); !hri.last(); hri.next() ) {
+		n_data++;
+		float f 	= fphis[hri].f();
+		float irs 	= hri.invresolsq();
+		if ( !clipper::Util::is_nan(f) ) {
+//
+//			std::cout	<< "  \t  " << f << "  \t  " << irs 
+//					<< "\t" << hri.hkl().h() << "\t"<< hri.hkl().k() << "\t"<< hri.hkl().l() 
+//					<< std::endl ;n_own++;
+//
+			clipper::HKL rfl(hri.hkl().h()*-1,hri.hkl().k()*-1,hri.hkl().l()*-1);
+			clipper::HKL mno;
+			int cidx;
+			//cidx	= hri.base_hkl_info().index_of(rfl);
+			int sym=0; bool friedel=false; 
+			mno	= hri.base_hkl_info().find_sym(rfl,sym,friedel); //index_of(rfl); 
+			cidx	= hri.base_hkl_info().index_of(mno);
+			if( cidx<0 ) {
+				// std::cout << " " << cidx << std::endl;
+				continue;
+			}
+			clipper::HKL_info::HKL_reference_index hri_m( hri.base_hkl_info(), cidx );
+			float df	= fphis[hri_m].f();
+			std::cout << "INFO \t " << df << std::endl;
+			df*=df;f*=f;
+			fphis[hri].f() = f-df; 
+			fphis[hri].phi() = 0.0; 
+		}
+		else {
+			n_inf++;
+		}
+	}
+	if( n_inf == n_data )
+		std::cout << "INFO::ERROR" << std::endl; 
+	std::cout << "INFO::COUNT\t" << n_own << std::endl; 
+	xmap.fft_from(fphis);
+	std::cout << "INFO::DONE HERE" << std::endl;
+ 
+	return xmap;
+}
+
+float optimal_B_std_moment( clipper::HKL_data< clipper::datatypes::F_phi<float> > original_fphis , int imom ) {
+// 
+// CALCULATES THE OPTIMAL BFACTOR:
+// PERFORMS A GOLDEN RATIO SEARCH ON
+// THE KURTOSIS OF THE ENTIRE SUPPLIED MAP
+// 
+	float sharpening_limit = 100;	
+	float kurtosis=0.0, B_optimal=0.0;
+	float a =-1.0*sharpening_limit, b=1.0*sharpening_limit, TOL=1E-2, TOLB=40E0;
+	float fa= 0.0 , fb = 0.0;
+	float fc= 0.0 , fd = 0.0, golden_ratio = (sqrt(5.0)-1.0)*0.5;
+	float c = b-golden_ratio*(b-a);
+	float d = a+golden_ratio*(b-a);
+	float k = 1E-20, m=1.0;
+	float a0=a;
+
+	std::cout << "GOLDEN RATIO SEARCH::";
+
+	if ( true ) {
+		fa	= calc_standardized_moment( sharpen ( a, original_fphis ), imom, 0 );
+        	fb	= calc_standardized_moment( sharpen ( b, original_fphis ), imom, 0 );
+        	k = (fb-fa)/(b-a);
+        	m = fa;
+		while( d-c > TOL ) {
+			fc		= calc_standardized_moment( sharpen ( c, original_fphis ), imom , 0 );
+			fd		= calc_standardized_moment( sharpen ( d, original_fphis ), imom , 0 );
+			if(d-c>TOLB) {
+				fc	/= (k*(c-a0)+m);
+				fd	/= (k*(d-a0)+m);
+			}
+			if( fc > fd ) { // FIND MAXIMUM
+				b = d; d = c;
+				c = b - golden_ratio*( b - a );
+			} else {
+				a = c; c = d;
+				d = a + golden_ratio*( b - a );
+			}
+		}
+		B_optimal = (c+d)*0.5;
+	}
+	return B_optimal;
+}
+
+void scale_xmap( clipper::Xmap<float>& xmap , float scalef ) {
+	for( clipper::Xmap<float>::Map_reference_index midx = xmap.first(); !midx.last(); midx.next() ) {
+		float x		= xmap[midx];					// THE VALUE
+		xmap[midx]	= x * scalef;
+	}
+}
+
+void
+analyze_mtz_header(	clipper::HKL_data< clipper::datatypes::I_sigI<float> >& fphidata,
+			clipper::HKL_info &myhkl, clipper::MTZcrystal& 	xtal,
+			std::string filename, std::vector<int> iselect , 
+			int verbose , int nselect ) {
+
+	clipper::CCP4MTZfile 	mtzin;
+
+	std::string 		fphi_str;
+	int is_mtz_file = 0, write_mtz = 0;
+	std::string ext("mtz");
+	std::size_t found = filename.find(ext);
+	std::string cols;
+	std::string::size_type sz;
+	int n_reflections=0;
+	nselect=2;
+
+//	std::cout << " " ;
+//	for(int i=0;i<iselect.size();i++)
+//		std::cout << iselect[i] << " ";
+//	std::cout << " \n" ;
+
+	if (found!=std::string::npos){
+		std::cout << "INFO:: FOUND MTZ INPUT NAME" << std::endl;
+		try { 
+			mtzin.open_read( filename );	
+			is_mtz_file = 1;
+		}
+   		catch ( ... ) {
+     			std::cout << "INFO:: NOT A VALID MTZ FILE: " << filename << std::endl;
+      			is_mtz_file = 0;
+   		} 
+
+	    	std::string label;
+	    	std::string type;
+		std::string mtypF("I"),mtypP("Q");
+		std::string mlab("WT");
+		std::string selection("/[");
+		std::string base_str;
+
+		boost::sort(iselect);
+
+		if (is_mtz_file) { 
+			int nHit=0;
+			mtzin.set_column_label_mode( clipper::CCP4MTZfile::Legacy );
+			std::vector<clipper::String> v = mtzin.column_labels();
+			if (v.size() > 1) { 
+				int read_success = 1;
+				for (unsigned int i=0; i<v.size(); i++) {
+					if(verbose)
+						std::cout << i << " " << v[i] << "\n";
+	    				std::string::size_type ispace = v[i].find_last_of(" ");
+	    				if (ispace == std::string::npos) {
+						std::cout <<  "WARNING:: uninterprettable label \"" 
+						<< v[i] << "\" of "<< filename[0] << "\n";
+					} else {
+						label = v[i].substr(0, ispace);
+						type  = v[i].substr(ispace+1);
+
+						int bDo=0;
+						std::size_t found = label.find(mlab);
+						bDo+=(iselect.size()!=nselect)&&(found!=std::string::npos);
+						
+						for(int ii=0;ii<iselect.size();ii++){
+							if(ii<nselect)
+								bDo+=iselect[ii]==i;
+						}
+						if( bDo>0 && nHit < nselect ) {
+							nHit++;
+							base_str 	 = SplitString(label,"\\/",0);
+							std::string toplabel_str = SplitString(label,"\\/",1);
+							selection	+= toplabel_str;
+							selection	+= (nHit==1)?(","):("]");
+						}
+						if(verbose==2) {
+							std::cout << "Got label :" << label 
+							<< ": and type :" << type << ":\n";
+							SplitFilename (label);	
+						}
+					}
+				}
+			}
+		}
+
+		fphi_str = base_str+selection;
+		if(verbose)
+			std::cout << "INFO:: WILL GET DATA FROM: " << fphi_str << std::endl;
+		mtzin.import_hkl_info( myhkl );	
+		mtzin.import_crystal ( xtal	, fphi_str );
+		mtzin.import_hkl_data( fphidata	, fphi_str );
+		mtzin.close_read();
+		if(verbose) {
+			n_reflections = fphidata.num_obs();
+			std::cout << "INFO:: NUMBER OF OBSERVED REFLECTIONS: " << n_reflections << "\n";
+		}
+	}
+	if (n_reflections <= 0 ) {
+		die( " \t \t ::ERROR:: NO REFLECTIONS IN MTZ!?" );
+	}
+}
+
+void
+analyze_mtz_header(	clipper::HKL_data< clipper::datatypes::F_phi<float> >& fphidata,
+			clipper::HKL_info &myhkl, clipper::MTZcrystal& 	xtal,
+			std::string filename, std::vector<int> iselect , 
+			int verbose , int nselect ) {
+
+	clipper::CCP4MTZfile 	mtzin;
+
+	std::string 		fphi_str;
+	int is_mtz_file = 0, write_mtz = 0;
+	std::string ext("mtz");
+	std::size_t found = filename.find(ext);
+	std::string cols;
+	std::string::size_type sz;
+	int n_reflections=0;
+	nselect=2;
+
+//	std::cout << " " ;
+//	for(int i=0;i<iselect.size();i++)
+//		std::cout << iselect[i] << " ";
+//	std::cout << " \n" ;
+
+	if (found!=std::string::npos){
+		std::cout << "INFO:: FOUND MTZ INPUT NAME" << std::endl;
+		try { 
+			mtzin.open_read( filename );	
+			is_mtz_file = 1;
+		}
+   		catch ( ... ) {
+     			std::cout << "INFO:: NOT A VALID MTZ FILE: " << filename << std::endl;
+      			is_mtz_file = 0;
+   		} 
+
+	    	std::string label;
+	    	std::string type;
+		std::string mtypF("F"),mtypP("P");
+		std::string mlab("WT");
+		std::string selection("/[");
+		std::string base_str;
+
+		boost::sort(iselect);
+
+		if (is_mtz_file) { 
+			int nHit=0;
+			mtzin.set_column_label_mode( clipper::CCP4MTZfile::Legacy );
+			std::vector<clipper::String> v = mtzin.column_labels();
+			if (v.size() > 1) { 
+				int read_success = 1;
+				for (unsigned int i=0; i<v.size(); i++) {
+					if(verbose)
+						std::cout << i << " " << v[i] << "\n";
+	    				std::string::size_type ispace = v[i].find_last_of(" ");
+	    				if (ispace == std::string::npos) {
+						std::cout <<  "WARNING:: uninterprettable label \"" 
+						<< v[i] << "\" of "<< filename[0] << "\n";
+					} else {
+						label = v[i].substr(0, ispace);
+						type  = v[i].substr(ispace+1);
+
+						int bDo=0;
+						std::size_t found = label.find(mlab);
+						bDo+=(iselect.size()!=nselect)&&(found!=std::string::npos);
+						
+						for(int ii=0;ii<iselect.size();ii++){
+							if(ii<nselect)
+								bDo+=iselect[ii]==i;
+						}
+						if( bDo>0 && nHit < nselect ) {
+							nHit++;
+							base_str 	 = SplitString(label,"\\/",0);
+							std::string toplabel_str = SplitString(label,"\\/",1);
+							selection	+= toplabel_str;
+							selection	+= (nHit==1)?(","):("]");
+						}
+						if(verbose==2) {
+							std::cout << "Got label :" << label 
+							<< ": and type :" << type << ":\n";
+							SplitFilename (label);	
+						}
+					}
+				}
+			}
+		}
+
+		fphi_str = base_str+selection;
+		if(verbose)
+			std::cout << "INFO:: WILL GET DATA FROM: " << fphi_str << std::endl;
+		mtzin.import_hkl_info( myhkl );	
+		mtzin.import_crystal ( xtal	, fphi_str );
+		mtzin.import_hkl_data( fphidata	, fphi_str );
+		mtzin.close_read();
+		if(verbose) {
+			n_reflections = fphidata.num_obs();
+			std::cout << "INFO:: NUMBER OF OBSERVED REFLECTIONS: " << n_reflections << "\n";
+		}
+	}
+	if (n_reflections <= 0 ) {
+		die( " \t \t ::ERROR:: NO REFLECTIONS IN MTZ!?" );
+	}
+}
+
+void output_nobel_matrix( gsl_matrix *mat ) {
+	std::cout << "\n[========================] " << std::endl;
+	std::cout << mat->size1 << std::endl;
+	std::cout << "NOBEL" << std::endl;
+	for(int i=0;i<mat->size1;i++) {
+		std::cout << " He ";
+		for(int j=0;j<mat->size2;j++) {
+			std::cout << " " << gsl_matrix_get(mat,i,j)*2.0;
+		}
+		std::cout << "\n";
+	}
+	std::cout << "[========================] " << std::endl;
+}
+
+int
+assign_via_distmatrix( gsl_matrix *A ) {
+
+	int dspace	= DIM;
+	int N		= A->size1;
+	gsl_matrix *X	= gsl_matrix_calloc( N , dspace );
+	gsl_matrix *D	= gsl_matrix_calloc( N , N );
+	gsl_matrix *Y	= gsl_matrix_calloc( dspace, N );
+	gsl_vector *b   = gsl_vector_calloc( N );
+	gsl_vector_set_all( b , 1.0 );
+	gsl_matrix_memcpy(  D, A );
+
+	if(A->size1!=A->size2) {
+		fatal("INFO::ERROR::DIMENSIONS");
+	}
+
+	for(int i=0;i<N;i++)
+	{
+		for(int j=0;j<N;j++)
+		{
+			double dij	= gsl_matrix_get(D,i,j);
+			double dNj	= gsl_matrix_get(D,N-1,j);
+			double diN	= gsl_matrix_get(D,i,N-1);
+			double nDij	= (diN+dNj-dij)*0.5;
+			gsl_matrix_set ( D, i, j , nDij );
+		}
+	}
+
+	gsl_matrix *U	= gsl_matrix_alloc( N, N );
+	gsl_matrix *V	= gsl_matrix_alloc( N, N );
+	gsl_vector *S	= gsl_vector_alloc( N );
+	gsl_vector *wrk = gsl_vector_alloc( N );
+	gsl_linalg_SV_decomp ( D, V, S, wrk ); 		
+	gsl_matrix_memcpy(  U, D );
+	gsl_matrix *E	= gsl_matrix_calloc( N, dspace );
+	for(int i=0;i<dspace;i++)
+		gsl_matrix_set( E, i, i, sqrt(gsl_vector_get(S,i)) );
+		gsl_blas_dgemm (CblasNoTrans, CblasNoTrans,
+			1.0, U, E, 0.0, X );
+	gsl_matrix_transpose_memcpy( Y, X );
+
+	output_nobel_matrix(X);
+
+	gsl_matrix_free(X);
+	gsl_matrix_free(Y);
+	gsl_matrix_free(U);
+	gsl_matrix_free(V);
+	gsl_matrix_free(D);
+
+	return 0;
+}
+
+
+int main ( int argc, char ** argv ) {
+	int verbose = 0;
+
+	if(argc<2)
+		fatal("NOT ENOUGH ARGUMENTS");
+
+//	PREPARING ARGPARSER
+	std::pair < int, char ** >	margs;
+	margs.first = argc; margs.second = argv;
+
+	std::vector < std::pair < int, std::pair<std::string, std::string > > >	opts_n_defaults;
+	std::pair	< int, std::pair<std::string,std::string > > 		vipss;
+	vipss.first=1;	vipss.second.first	= "-i"; 
+			vipss.second.second	= "imap.mtz \t crystallographic map file";
+	opts_n_defaults.push_back(vipss);
+	vipss.first=0;	vipss.second.first	= "-x"; 
+			vipss.second.second	= "imol.pdb \t molecular sequence";
+	opts_n_defaults.push_back(vipss);
+	vipss.first=0;	vipss.second.first	= "-s"; 
+			vipss.second.second	= "1,3,5    \t (no white spaces)";
+	opts_n_defaults.push_back(vipss);
+
+//	EXECUTING ARGPARSE
+	std::vector<int> v_set;
+	for( int i=0 ; i < opts_n_defaults.size() ; i++ )
+		v_set.push_back(0);
+	std::pair< int , std::vector< std::string > > run_args = argparser( margs, v_set, opts_n_defaults );
+	if(run_args.first) { // FAILED
+		fatal();
+	}
+
+	int nselect=2;
+	std::vector<int> usel;
+	if( v_set[2] ) {
+		std::vector< std::string > wrds;
+		boost::split( wrds, run_args.second[2], boost::is_any_of(",") );
+		for(int i=0;i<wrds.size();i++)
+			usel.push_back( atoi( wrds[i].c_str() ) );
+	}
+
+//	EXECUTING MTZ HEADER AND CRYST READING
+	if( v_set[0] ){
+		clipper::HKL_data< clipper::datatypes::F_phi<  float > > fphidata;
+		clipper::HKL_data< clipper::datatypes::I_sigI< float > > Isigdata;
+		clipper::HKL_info myhkl,hklp;
+		clipper::MTZcrystal xtal;
+		analyze_mtz_header(	Isigdata, myhkl, xtal,
+					run_args.second[0], usel , 
+					1 , nselect )	;
+		clipper::HKL_info::HKL_reference_index ih,jh;
+		std::vector<std::vector<float>> vvd;
+
+		int choice=0;
+		switch(choice) {
+			case 1:  { // THIS DOESNT WORK...
+				float nsig = 60.0;
+				for ( ih = myhkl.first(); !ih.last(); ih.next() ) {
+					float val =Isigdata[ih].I();
+					float sig =Isigdata[ih].sigI();
+					if(val<sig*nsig)
+						continue;
+					int h=ih.hkl().h(), k=ih.hkl().k(), l=ih.hkl().l();
+/*	
+				std::cout	<< "h,k,l " << h << " "
+						<< k << " " << l << " < "
+						<< val << " " << sig << " > "<<std::endl;
+*/	
+					std::vector<float> vd;
+					for ( jh = myhkl.first(); !jh.last(); jh.next() ) {
+						float var	= Isigdata[jh].I();
+						float sik	= Isigdata[jh].sigI();
+						if(var<sik*nsig)
+							continue;
+						int m=jh.hkl().h(),n=jh.hkl().k(),o=jh.hkl().l();
+						float vva	= val-var;
+						float ir	= sqrt((h-m)*(h-m)+(k-n)*(k-n)+(l-o)*(l-o));
+						vd.push_back(ir);
+					}
+					vvd.push_back(vd);
+				}
+				std::cout << "INFO::" << vvd.size() << " " << vvd[0].size() << std::endl; 
+				int D1 = vvd.size(), D2 = vvd[0].size();
+				if(D1!=D2)
+					exit(-1);
+				gsl_matrix *XI=gsl_matrix_calloc(D1,D2);
+				std::cout << "DONE:: calloc"<< std::endl;
+				for(int i=0;i<D1;i++){
+					for(int j=0;j<D2;j++){
+						gsl_matrix_set( XI, i, j, vvd[i][j]);
+					}
+				}
+				assign_via_distmatrix( XI ); 
+				gsl_matrix_free(XI);
+				break;
+			}
+			case 0: {
+				std::cout << "THIS::Puvw mod" << std::endl;
+				clipper::HKL_info::HKL_reference_index hri;
+				clipper::HKL_data< clipper::datatypes::F_sigF<float>	> fsig ( myhkl );
+
+				clipper::Spacegroup
+					pspgr( clipper::Spgr_descr( myhkl.spacegroup().generator_ops().patterson_ops() ) );
+				hklp.init( pspgr, myhkl.cell(), myhkl.resolution(), true );
+
+				clipper::HKL_data< clipper::datatypes::F_phi<float>	> fphi ( hklp );
+				for( hri = myhkl.first(); !hri.last(); hri.next() ) {
+					fsig[ hri ].f() = Isigdata[ hri ].I()/Isigdata[ hri ].sigI();
+					clipper::data32::F_sigF f = fsig[ hri ];
+					double inorm	= sqrt(2.0*M_PI*Isigdata[ hri ].sigI());
+					float fgp	= exp(-0.5*f.f()*f.f())/inorm ;
+					fphi[hri].f()	= fgp;
+					float lenhkl	= (hri.hkl().h()*hri.hkl().h()+hri.hkl().k()*hri.hkl().k()+hri.hkl().l()*hri.hkl().l());
+					fphi[hri].phi()	= rand()*M_PI;
+				}
+				clipper::Xmap<float> xmap;
+				const float map_sampling_rate = 1.5;
+				clipper::Grid_sampling	gs (	myhkl.spacegroup(),
+								myhkl.cell(),
+								myhkl.resolution(),
+								map_sampling_rate	); 
+				xmap.init	( myhkl.spacegroup(), myhkl.cell(), gs );
+				xmap.fft_from( fphi );
+				clipper::CCP4MAPfile mapout;
+				std::string filename	= "puvw.map";
+				mapout.open_write	( filename );
+				mapout.export_xmap	( xmap );	
+				mapout.close_write	();
+				break;
+			}
+			default: {
+				std::cout << "THIS::Puvw" << std::endl;
+				clipper::HKL_info::HKL_reference_index hri;
+				clipper::HKL_data< clipper::datatypes::F_sigF<float>	> fsig ( myhkl );
+				clipper::HKL_data< clipper::datatypes::F_phi<float>	> fphi ( myhkl );
+				for( hri = myhkl.first(); !hri.last(); hri.next() ) {
+					fsig[hri].f() = Isigdata[hri].I();
+					clipper::data32::F_sigF f = fsig[hri] ;
+					fphi[hri].f() = f.f();
+					fphi[hri].phi() = 0.0 ;
+				}
+				clipper::Xmap<float> xmap;
+				const float map_sampling_rate = 1.5;
+				clipper::Grid_sampling	gs (	myhkl.spacegroup(),
+								myhkl.cell(),
+								myhkl.resolution(),
+								map_sampling_rate	); 
+				xmap.init	( myhkl.spacegroup(), myhkl.cell(), gs );
+				xmap.fft_from( fphi );
+				clipper::CCP4MAPfile mapout;
+				std::string filename	= "puvw.map";
+				mapout.open_write	( filename );
+				mapout.export_xmap	( xmap );	
+				mapout.close_write	();
+				break;
+			}
+		}		
+	}
+	return 0;
+}
