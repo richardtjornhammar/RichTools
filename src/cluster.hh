@@ -117,6 +117,7 @@ namespace richanalysis {
 			bool		isSet		(void)	{ return ( bSet_ );	};	
 			ids		getIDs		(void)	{ return (idlabels_);	};
 			void		setIDs	(ids vid)	{ idlabels_ = vid ;	};
+			std::vector<std::pair<int,int>>	return_ocids(void){ return ( o_idx_ ); };
 			void		print_all( void ) {
 						output_matrix( M_ );
 						output_vector(vc_ );
@@ -156,13 +157,15 @@ namespace richanalysis {
 		public:
 			node_analysis() {	bNode_ = false; bLayer_ = false; bMDlabels_ = false;};
 			node_analysis( node n ) {	bNode_ = assign_node( n );	};
+			node_analysis( node n, int i ) {	bNode_ = assign_node( n, i );	};
 			std::vector< int >	find_centroid_relation( void );
 			std::vector< int >	find_centroid_distance_relation( void );
 			particles		regular_fit(	void	);
+			particles		ordered_fit(	void	);
 			particles		regular_fit(	int	);
 			particles		nn_restraint_fit( int );
 			particles		centroid_frag_fit(	void	);
-			particles		seeded_centroids(	void	);
+			particles		seeded_centroids (	void	);
 			particles		get_centroids( int ) ;
 			std::vector< int >	global_index_order ( void ) { return glob_idx_order_; };
 			std::vector< int >	cluster_index_order( void ) { return cidx_; };
@@ -180,6 +183,7 @@ namespace richanalysis {
 						};
 			particles		centroid_to_nearest( void );
 			bool			assign_node( node n );
+			bool			assign_node( node n , int i );
 			bool			allSet()	{ return ( bNode_ && bLayer_ ); };
 			bool			haveNode()	{ return ( bNode_); };
 			bool			haveLayer()	{ return ( bLayer_ ); };

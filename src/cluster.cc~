@@ -1478,7 +1478,6 @@ bool logic_asce(std::pair<int, double> id1 ,std::pair<int, double> id2) {
 
 void
 cluster::order_centroids(void) {
-	// SANITY CHECK 
 	if( isSet() ) {
 		int N 		= length_C();
 		particles cents	= get_centroids( );
@@ -1487,29 +1486,97 @@ cluster::order_centroids(void) {
 		for(int i=0;i<N;i++) {
 			gsl_vector_add(r0, cents[i].second);
 		}
-		if(n==0){
+		if(n<=0) {
 			std::cout << "CANNOT PROCEED WITH CENTROID ORDERING" << std::endl;
 			exit(-1);
 		}
 		gsl_vector_scale( r0, 1.0/n );
 		std::vector< std::pair<int, double> > vpid;
-		for(int i=0;i<N;i++){
+		for(int i=0;i<N;i++) {
 			std::pair<int,double> pid;
 			gsl_vector_sub(cents[i].second,r0);
 			pid.first  = i; 
-			pid.second = gsl_blas_dnorm2(cents[i].second);
+			pid.second = gsl_blas_dnrm2(cents[i].second);
 			vpid.push_back(pid);
 		}
 		std::sort( vpid.begin(), vpid.end(), logic_asce );
-		if(o_idx_.size()>0)
+		if ( o_idx_.size()>0 )
 			o_idx_.clear();
-		for(int i=0;i<N;i++) {
+		for( int i=0;i<N;i++ ) {
 			std::pair< int, int > spii;
 			spii.first	= i;
 			spii.second	= vpid[i].first;
 			o_idx_.push_back(spii);			
 		}
 	}
+}
+
+
+particles
+node_analysis::ordered_fit( ) {
+	int choice	= 0;
+	particles pf;
+	cluster c1 	= parents_.first;
+	cluster c2 	= parents_.second;
+
+	if( !(c1.length_C() == c2.length_C()) ) {
+		std::cout << "ERROR::BAD NODE" << std::endl;
+		exit(-1);
+	}
+
+	gmat *P 	= gsl_matrix_calloc( DIM, c2.length_M() );
+	gmat *Q 	= gsl_matrix_calloc( DIM, c1.length_M() );
+
+	gmat *PC 	= gsl_matrix_calloc( DIM, c2.length_C() );
+	gmat *QC 	= gsl_matrix_calloc( DIM, c1.length_C() );
+	gmat *TEMP 	= gsl_matrix_calloc( DIM, c1.length_C() );
+
+	gmat *U 	= gsl_matrix_calloc( DIM, DIM );
+	gmat *iU 	= gsl_matrix_calloc( DIM, DIM );
+	gvec *it 	= gsl_vector_calloc( DIM );
+	gvec *t 	= gsl_vector_calloc( DIM );
+	gvec *vl 	= gsl_vector_calloc( c2.length_M() );
+
+	richanalysis::coord_format cf;
+
+	gsl_vector_set_all(vl,1);
+	c2.copyM(P);
+	c1.copyM(Q);
+	c2.copyC(PC);
+	c1.copyC(QC);
+	pf 		= cf.mat2par (P, vl);
+
+	std::vector<std::pair<int,int>>	oidx_c1 = c1.return_ocids();
+	std::vector<std::pair<int,int>>	oidx_c2 = c2.return_ocids();
+
+	for( int i=0 ; i<c1.length_C() ; i++ ) {
+		gsl_matrix_get_col( t , QC , i );
+		gsl_matrix_set_col( t , oidx_c1[i].second , TEMP );
+	}
+	gsl_matrix_memcpy ( QC, TEMP );
+	for( int i=0 ; i<c2.length_C() ; i++ ) {
+		gsl_matrix_get_col( t , PC , i );
+		gsl_matrix_set_col( t , oidx_c2[i].second , TEMP );
+	}
+	gsl_matrix_memcpy ( PC, TEMP );
+
+	ftyp rmsd	= kabsch_fit( PC, QC, U, t ); 
+	output_matrix(U);
+	invert_fit	( U, t, iU, it );
+	output_matrix(iU);
+	apply_fit( pf, iU, it ); 
+
+	bool overwrite_model=true;
+	for( int i=0 ; i<pf.size() ; i++ ){
+		pf[i].first = "C";
+	}
+
+	if( overwrite_model ) {
+		parents_.second.set_matrix(pf);
+		parents_.second.find_centroids();
+	}
+
+	return pf;
 }
 
 bool
@@ -1592,6 +1659,38 @@ node_analysis::assign_node( node n ) {
 			bLayer_= false;
 		}
 		bNode_ = true;
+	}else{
+		bNode_ = false;
+	}
+
+	return bNode_;
+}
+
+
+bool
+node_analysis::assign_node( node n , int i ) {
+	std::cout << "INFO:: ASSIGNING NODE" << std::endl;
+	n.first.find_centroids();
+	n.second.find_centroids();
+
+	cluster c1 = n.first;
+	cluster c2 = n.second;
+	std::vector<int> cindx;
+
+	int N, M, L, K;
+	int rDIM=c1.get_cDIM();
+
+	if( c1.get_cDIM() != c2.get_cDIM() ) {
+		std::cout << "ERROR WITH DIMENSION OF CLUSTER PAIRS" << std::endl;
+		bNode_= false; bLayer_= false;
+		return false;
+	}
+
+	if( c1.isSet() && c2.isSet() ) {
+		parents_.first  = c1;
+		parents_.second = c2;
+		bNode_ = true;
+		// LAYER IS NOT SET
 	}else{
 		bNode_ = false;
 	}
