@@ -227,11 +227,12 @@ int main (int argc, char **argv) {
 	pa.assign_particles( pcs , c_aligned );
 //	pa.remove_centroids();
 	pa.density_model_integer_run( pcs, c_aligned );
-	pa.print_model(		"realigned.pdb"		);
-	pa.print_density(	"relabeled.pdb"		);
+	pa.print_model	 ( "realigned.pdb" );
+	pa.print_density ( "relabeled.pdb" );
 //
 	return 0;
 }
+
 //
 //// DEBUG SECTION:: SINGLE PASS
 /*

@@ -1466,6 +1466,52 @@ cluster::get_centroids( void ) {
 	}
 }
 
+
+bool logic_desc(std::pair<int, double> id1 ,std::pair<int, double> id2) {
+	return id1.second>id2.second;
+}
+
+bool logic_asce(std::pair<int, double> id1 ,std::pair<int, double> id2) {
+	return id1.second<id2.second;
+}
+
+
+void
+cluster::order_centroids(void) {
+	// SANITY CHECK 
+	if( isSet() ) {
+		int N 		= length_C();
+		particles cents	= get_centroids( );
+		gsl_vector *r0	= gsl_vector_calloc(DIM);
+		int n		= ((float)N);
+		for(int i=0;i<N;i++) {
+			gsl_vector_add(r0, cents[i].second);
+		}
+		if(n==0){
+			std::cout << "CANNOT PROCEED WITH CENTROID ORDERING" << std::endl;
+			exit(-1);
+		}
+		gsl_vector_scale( r0, 1.0/n );
+		std::vector< std::pair<int, double> > vpid;
+		for(int i=0;i<N;i++){
+			std::pair<int,double> pid;
+			gsl_vector_sub(cents[i].second,r0);
+			pid.first  = i; 
+			pid.second = gsl_blas_dnrm2(cents[i].second);
+			vpid.push_back(pid);
+		}
+		std::sort( vpid.begin(), vpid.end(), logic_asce );
+		if(o_idx_.size()>0)
+			o_idx_.clear();
+		for(int i=0;i<N;i++) {
+			std::pair< int, int > spii;
+			spii.first	= i;
+			spii.second	= vpid[i].first;
+			o_idx_.push_back(spii);			
+		}
+	}
+}
+
 bool
 node_analysis::assign_node( node n ) {
 	std::cout << "INFO:: ASSIGNING NODE" << std::endl;

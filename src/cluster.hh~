@@ -104,29 +104,32 @@ namespace richanalysis {
 						if(v0->size ==vc_->size) { gsl_vector_memcpy(vc_, v0); } 
 					};
 			int		get_cDIM(  void  )	{ return rDIM_; 	};	//	centroid dimension
-			void		set_cDIM(int rDIM)	{ rDIM_=rDIM; 
+			void		set_cDIM(int rDIM)	{ rDIM_=rDIM; //	centroid dimension
 						if(bSet_ )	{ 
-							gsl_matrix_free(C_); 
-							C_=gsl_matrix_calloc(DIM,rDIM); 
-							gsl_vector_free(wc_); 
-							gsl_vector_calloc(rDIM); }	};	//	centroid dimension
-			int		length_C(void)		{ return C_->size2;	};
-			int		length_M(void)		{ return M_->size2;	};
-			bool		isSet(void)		{ return ( bSet_ );	};	
-			ids		getIDs(void)		{ return (idlabels_);	};
-			void		setIDs(ids vid)		{ idlabels_ = vid ;	};
+							gsl_matrix_free(  C_ ); 
+							C_ = gsl_matrix_calloc( DIM, rDIM ); 
+							gsl_vector_free( wc_ ); 
+							gsl_vector_calloc( rDIM ); 
+								}	
+					};
+			int		length_C	(void)	{ return C_->size2;	};
+			int		length_M	(void)	{ return M_->size2;	};
+			bool		isSet		(void)	{ return ( bSet_ );	};	
+			ids		getIDs		(void)	{ return (idlabels_);	};
+			void		setIDs	(ids vid)	{ idlabels_ = vid ;	};
 			void		print_all( void ) {
-							output_matrix( M_ );
-							output_vector(vc_ );
-							output_matrix( C_ );
-							output_vector(wc_ );
-							output_matrix( A_ );
-						} ;
-			void		print_neighbors(void);
-			void		print_centroids(std::string);
-			particles	get_model(void);
-			particles	get_centroids(void);
-			ftyp		max_dist( void ) { return maxbond_; };
+						output_matrix( M_ );
+						output_vector(vc_ );
+						output_matrix( C_ );
+						output_vector(wc_ );
+						output_matrix( A_ );
+					} ;
+			void		print_neighbors ( void );
+			void		print_centroids ( std::string );
+			particles	get_model	( void );
+			particles	get_centroids	( void );
+			ftyp		max_dist	( void ) { return maxbond_; };
+			void		order_centroids	( void );
 		private:
 			gmat	*M_; 		// 0 THE ORIGINAL COORDINATES 
 			gmat	*C_; 		// 1 THE CENTROIDS
@@ -143,6 +146,7 @@ namespace richanalysis {
 			bool bHaveNN_;
 //	FOR SETS WITH SMALL N (MODEL) AN ALTERNATIVE IS DISTANCE MATRICES
 			ftyp maxbond_;
+			std::vector<std::pair<int,int>> o_idx_;
 	};
 	
 	typedef std::pair< cluster, cluster > node;
@@ -210,7 +214,7 @@ namespace richanalysis {
 			particle_analysis( ) {	bAssigned_	= false; bMatrices_	= false; 
 						bSingleSet_	= false; bHaveUt_	= false;   };
 			int 			calc_distance_matrices(void);
-			int 			calc_distance_matrix( gmat *D, particles p );
+			int 			calc_distance_matrix	( gmat *D, particles p );
 			std::vector< int >	find_via_distance	( gmat *A, ftyp level );
 			std::vector< int > 	outp_distance_matrix	( gmat *A, ftyp level );
 			std::vector< int > 	outp_distance_matrix	( gmat *A );
@@ -240,6 +244,7 @@ namespace richanalysis {
 			bool			single( void )   { return bSingleSet_; };
 			std::vector<int>	return_idx(void) { return rel_idx_   ; };
 			void		print_model(std::string);
+			void		print_density(std::string);
 			void		copyC(gmat *C0) { 
 						if(C0->size1==C_->size1&&C0->size2==C_->size2) { gsl_matrix_memcpy(C0, C_); } 
 					};
