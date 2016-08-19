@@ -56,6 +56,10 @@ namespace richanalysis {
 			int	center_matrix	( gmat *P , gvec *p0 	);
 			int	invert_matrix	( gmat *A , gmat *invA	);
 			ftyp	get_det		( gmat *A );
+		//!	from r -> u,s,v
+			int	svd_dec		(gmat *r, gmat *u, gvec *s, gmat *v);
+		//!	from u,s,v -> r
+			int	svd_rec		(gmat *r, gmat *u, gvec *s, gmat *v);
 	};
 
 	class fitting : public linalg, public tensorIO {

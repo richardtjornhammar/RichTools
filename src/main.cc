@@ -169,14 +169,14 @@ int main (int argc, char **argv) {
 		n1.first.set_matrix ( vparts[1] ); model=vparts[0];
 		n1.second.set_matrix( vparts[0] ); densi=vparts[1];
 	}
-	int s=floor(model.size()/8);
+	int	s = floor(	model.size()/8	);
 	s=s<3?3:s; 
 	n0.first .set_cDIM(s);	
 	n0.first .realloc_centroids(s);
 	n0.second.set_cDIM(s);	
 	n0.second.realloc_centroids(s);
 
-	s = floor(model.size());
+		s = floor(	model.size()	);
 	std::cout << "WILL ALLOCATE FOR " << s << " CENTROIDS " << std::endl;
 	n1.first .set_cDIM(s);	
 	n1.first .realloc_centroids(s);
@@ -197,6 +197,7 @@ int main (int argc, char **argv) {
 // B	ORDER DEPENDENT
 	richanalysis::node_analysis nnode(n0);
 
+	nnode.dimred_fit();
 
 	particles c_aligned = nnode.regular_fit();	// shape fit
 	n0.first .find_centroids();

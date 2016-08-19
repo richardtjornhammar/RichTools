@@ -1466,6 +1466,14 @@ cluster::get_centroids( void ) {
 	}
 }
 
+int
+clustering::calc_largest_reduction(gmat *X) {
+	int N0	= X->size1, M0 = X->size2;
+	float N	= N0>M0?M0:N0;
+	float M = N0>M0?N0:M0;
+	int ndirect = floor(sqrt(M/N));
+	return ndirect;
+}
 
 bool logic_desc(std::pair<int, double> id1 ,std::pair<int, double> id2) {
 	return id1.second>id2.second;
@@ -1474,7 +1482,6 @@ bool logic_desc(std::pair<int, double> id1 ,std::pair<int, double> id2) {
 bool logic_asce(std::pair<int, double> id1 ,std::pair<int, double> id2) {
 	return id1.second<id2.second;
 }
-
 
 void
 cluster::order_centroids(void) {
@@ -1486,7 +1493,7 @@ cluster::order_centroids(void) {
 		for(int i=0;i<N;i++) {
 			gsl_vector_add(r0, cents[i].second);
 		}
-		if(n<=0) {
+		if( n<=0 ) {
 			std::cout << "CANNOT PROCEED WITH CENTROID ORDERING" << std::endl;
 			exit(-1);
 		}
@@ -1509,6 +1516,151 @@ cluster::order_centroids(void) {
 			o_idx_.push_back(spii);			
 		}
 	}
+}
+
+int 
+clustering::gsl_dimreduction(gmat *X, gmat *Y) {
+	int sw=1;
+	if( Y->size1/Y->size2==DIM ) {
+		std::cout << "INFO::DOING REDUCTION" << std::endl;
+		gsl_matrix *U	= gsl_matrix_alloc( Y->size1, Y->size2 );
+		gsl_matrix *V	= gsl_matrix_alloc( Y->size1, Y->size2 );
+		gsl_vector *S	= gsl_vector_alloc( Y->size2 );
+		gsl_vector *work= gsl_vector_alloc( Y->size2 );
+/*
+		gsl_linalg_SV_decomp( Y, U, S, work );
+		gsl_matrix_memcpy( V, Y );
+
+		gsl_matrix_set_identity( EYE );
+
+	gsl_blas_dgemv (CblasNoTrans, double alpha, const gsl_matrix * A, const gsl_vector * x, double beta, gsl_vector * y)
+
+	gsl_matrix *EYE = gsl_matrix_alloc( D, D );
+	gsl_matrix *TMP = gsl_matrix_alloc( D, D );
+	
+	gsl_matrix_set_identity( EYE );
+	
+	gsl_blas_dgemm(CblasNoTrans,CblasTrans, 1.0, V, W, 0.0, C);
+	double det = get_det(C);
+
+	if (det < 0){	// FLIP IT!
+		gsl_matrix_set(EYE,D-1,D-1,-1);
+		gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, W, 0.0, TMP);
+		gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, V, TMP, 0.0, C);
+	}
+	gsl_matrix_transpose_memcpy(U,C);
+
+*/
+		gsl_matrix_free(U);
+		gsl_matrix_free(V);
+		gsl_vector_free(S);
+		gsl_vector_free(work);
+	} else {
+		std::cout << "ERROR:: WRONG MAPPING" << std::endl;
+		exit(1);
+	}
+
+	return 0;
+}
+
+particles
+node_analysis::dimred_fit( ) {
+	int choice	= 0;
+	particles pf;
+	cluster c1 	= parents_.first;
+	cluster c2 	= parents_.second;
+
+	if( !(c1.length_C() == c2.length_C()) ) {
+		std::cout << "ERROR::BAD NODE" << std::endl;
+		exit(-1);
+	}
+
+// gsl_dimreduction(gmat *, gmat *);
+// gsl_dimreduction(gmat *, gmat *);
+
+	gmat *P 	= gsl_matrix_calloc( DIM, c2.length_M() );
+	gmat *Q 	= gsl_matrix_calloc( DIM, c1.length_M() );
+
+	int n_p = 	c1.calc_largest_reduction(P);
+	int n_q = 	c2.calc_largest_reduction(Q);
+
+	gmat *dr_P	=  gsl_matrix_calloc( DIM*n_p, n_p );
+	gmat *dr_Q	=  gsl_matrix_calloc( DIM*n_p, n_p );
+
+	if(n_p>n_q) {
+		std::cout << "ERROR::WILL EXIT" << std::endl;
+		exit(1);
+	}
+
+	int	rval = c1.gsl_dimreduction(P, dr_P);	// random?
+		rval = c2.gsl_dimreduction(Q, dr_Q);	// random?
+
+	gsl_matrix_free(  P );
+	gsl_matrix_free(  Q );
+	gsl_matrix_free(dr_P);
+	gsl_matrix_free(dr_Q);
+
+	return pf;
+/*
+
+	gmat *PC 	= gsl_matrix_calloc( DIM, c2.length_C() );
+	gmat *QC 	= gsl_matrix_calloc( DIM, c1.length_C() );
+	gmat *TEMP 	= gsl_matrix_calloc( DIM, c1.length_C() );
+
+	gmat *U 	= gsl_matrix_calloc( DIM, DIM );
+	gmat *iU 	= gsl_matrix_calloc( DIM, DIM );
+	gvec *it 	= gsl_vector_calloc( DIM );
+	gvec *t 	= gsl_vector_calloc( DIM );
+	gvec *vl 	= gsl_vector_calloc( c2.length_M() );
+
+	richanalysis::coord_format cf;
+
+	gsl_vector_set_all(vl,1);
+	c2.copyM(P);
+	c1.copyM(Q);
+	c2.copyC(PC);
+	c1.copyC(QC);
+	pf 		= cf.mat2par (P, vl);
+
+	std::vector<std::pair<int,int>>	oidx_c1 = c1.return_ocids();
+	std::vector<std::pair<int,int>>	oidx_c2 = c2.return_ocids();
+
+	for( int i=0 ; i<c1.length_C() ; i++ ) {
+		gsl_matrix_get_col( t , QC , i );
+		gsl_matrix_set_col( TEMP, oidx_c1[i].second, t );
+	}
+	gsl_matrix_memcpy ( QC, TEMP );
+	for( int i=0 ; i<c2.length_C() ; i++ ) {
+		gsl_matrix_get_col( t , PC , i );
+		gsl_matrix_set_col( TEMP, oidx_c2[i].second, t );
+	}
+	gsl_matrix_memcpy ( PC, TEMP );
+
+//ids labels = c2.getIDs	 idlabels_
+
+	ftyp rmsd	= kabsch_fit( PC, QC, U, t ); 
+	output_matrix(U);
+	invert_fit	( U, t, iU, it );
+	output_matrix(iU);
+	apply_fit( pf, iU, it ); 
+
+	bool overwrite_model=true;
+	ids labels = c2.getIDs();
+	for( int i=0 ; i<pf.size() ; i++ ){
+		pf[i].first = labels[i].second ;
+		if(0){
+			gsl_matrix_get_col( t , QC , i );
+			gsl_vector_memcpy ( pf[i].second, t );
+		}
+	}
+
+	if( overwrite_model ) {
+		parents_.second.set_matrix(pf);
+		parents_.second.find_centroids();
+	}
+
+	return pf;
+*/
 }
 
 
@@ -1560,6 +1712,8 @@ node_analysis::ordered_fit( ) {
 	}
 	gsl_matrix_memcpy ( PC, TEMP );
 
+//ids labels = c2.getIDs	 idlabels_
+
 	ftyp rmsd	= kabsch_fit( PC, QC, U, t ); 
 	output_matrix(U);
 	invert_fit	( U, t, iU, it );
@@ -1567,8 +1721,13 @@ node_analysis::ordered_fit( ) {
 	apply_fit( pf, iU, it ); 
 
 	bool overwrite_model=true;
+	ids labels = c2.getIDs();
 	for( int i=0 ; i<pf.size() ; i++ ){
-		pf[i].first = "C";
+		pf[i].first = labels[i].second ;
+		if(0){
+			gsl_matrix_get_col( t , QC , i );
+			gsl_vector_memcpy ( pf[i].second, t );
+		}
 	}
 
 	if( overwrite_model ) {

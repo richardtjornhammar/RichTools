@@ -62,6 +62,10 @@ namespace richanalysis {
 
 		//! performs my own connectivity clustering algorithm
 			int connectivity( gmat * , ftyp val );
+
+		//! performs a dimensionality reduction n,m -> p,q
+			int calc_largest_reduction( gmat * );
+			int gsl_dimreduction(gmat *, gmat *);
 	};
 
 	class cluster :  public clustering {
@@ -162,6 +166,7 @@ namespace richanalysis {
 			std::vector< int >	find_centroid_distance_relation( void );
 			particles		regular_fit(	void	);
 			particles		ordered_fit(	void	);
+			particles		dimred_fit(	void	);
 			particles		regular_fit(	int	);
 			particles		nn_restraint_fit( int );
 			particles		centroid_frag_fit(	void	);

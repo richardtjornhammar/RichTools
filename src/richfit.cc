@@ -142,6 +142,57 @@ linalg::get_det(gmat *A) {
 	return det;
 }
 
+int 
+linalg::svd_dec(gmat *r, gmat *u, gvec *s, gmat *v) {
+	int M=r->size1,N=r->size2;
+	if(!(		r->size1==u->size1 && r->size2==u->size2 
+		&&	r->size2==v->size1 && r->size2==v->size2
+		&&	s->size ==v->size1 )) {
+		std::cout << "ERROR::CANNOT DO SVD" << std::endl;
+		std::cout << "ERROR:: DIMS M,N = " << M << ", "<< N << std::endl;
+		std::cout << "ERROR:: U(M,N) \t = " <<u->size1 << ", " << u->size2<< std::endl;
+		std::cout << "ERROR:: S(N)   \t = " <<s->size << std::endl;
+		std::cout << "ERROR:: V(N,N) \t = " << v->size1<< ", " << v->size2<< std::endl;
+		exit(1);
+	}
+	gsl_vector *w = gsl_vector_calloc(N);	
+	gsl_matrix_memcpy ( u, r );
+	gsl_linalg_SV_decomp( u, v, s, w );
+	gsl_vector_free(w);
+	return 0;
+}
+
+int
+linalg::svd_rec(gmat *r, gmat *u, gvec *s, gmat *v) {
+	int M=r->size1,N=r->size2;
+	if(!(		r->size1==u->size1 && r->size2==u->size2 
+		&&	r->size2==v->size1 && r->size2==v->size2
+		&&	s->size ==v->size1 )) {
+		std::cout << "ERROR::CANNOT DO SVD" << std::endl;
+		std::cout << "ERROR:: DIMS M,N = " << M << ", "<< N << std::endl;
+		std::cout << "ERROR:: U(M,N) \t = " <<u->size1 << ", " << u->size2<< std::endl;
+		std::cout << "ERROR:: S(N)   \t = " <<s->size << std::endl;
+		std::cout << "ERROR:: V(N,N) \t = " << v->size1<< ", " << v->size2<< std::endl;
+		exit(1);
+	}
+	gsl_matrix *t = gsl_matrix_calloc(M,N);
+	gsl_matrix *z = gsl_matrix_calloc(N,N);
+
+	gsl_matrix_memcpy ( r, u );
+	for(int i=0;i<N;i++){
+		gsl_matrix_set( z,i,i, gsl_vector_get(s,i));
+	}
+//	dgemm cannot handle &u=&t
+	gsl_blas_dgemm(CblasNoTrans,CblasNoTrans, 1.0, u, z, 0.0, t);
+	gsl_blas_dgemm(CblasNoTrans,CblasTrans, 1.0, t, v, 0.0, u);
+	gsl_matrix_memcpy ( t, u );
+	gsl_matrix_memcpy ( u, r );
+	gsl_matrix_memcpy ( r, t );
+	gsl_matrix_free(t);
+	gsl_matrix_free(z);
+	return 0;
+}
+
 
 ftyp 
 fitting::shape_fit(	gmat *P , gmat *Q ,	// IN
@@ -515,7 +566,8 @@ fitting::kabsch_fit(	gsl_matrix *P, gsl_matrix *Q,			// IN
 		gsl_blas_dgemm( CblasNoTrans, CblasTrans, 1.0, EYE, V, 0.0, TMP);
 		gsl_blas_dgemm( CblasNoTrans, CblasNoTrans, 1.0, W, TMP, 0.0, C);
 	}
-	gsl_matrix_transpose_memcpy(U,C); // ok...
+	//gsl_matrix_transpose_memcpy(U,C);
+	gsl_matrix_memcpy(U,C);
 
 	gsl_blas_dgemv(CblasNoTrans, -1.0, U, p0, 1.0, q0);
 	gsl_vector_memcpy(t,q0); 
