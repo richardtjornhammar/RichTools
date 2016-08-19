@@ -1522,11 +1522,25 @@ int
 clustering::gsl_dimreduction(gmat *X, gmat *Y) {
 	int sw=1;
 	if( Y->size1/Y->size2==DIM ) {
-		std::cout << "INFO::DOING REDUCTION" << std::endl;
-		gsl_matrix *U	= gsl_matrix_alloc( Y->size1, Y->size2 );
-		gsl_matrix *V	= gsl_matrix_alloc( Y->size1, Y->size2 );
-		gsl_vector *S	= gsl_vector_alloc( Y->size2 );
-		gsl_vector *work= gsl_vector_alloc( Y->size2 );
+		std::cout << "###INFO::TESTING###" << std::endl;
+		int M=X->size1>X->size2?X->size1:X->size2;
+		int N=X->size2>X->size1?X->size1:X->size2;
+		gsl_matrix *R	= gsl_matrix_calloc( M, N );
+		if(X->size1<X->size2) {
+			gsl_matrix_transpose_memcpy(R,X);
+		}
+		gsl_matrix *U	= gsl_matrix_calloc( M,N );
+		gsl_matrix *V	= gsl_matrix_calloc( N,N );
+		gsl_vector *S	= gsl_vector_calloc( N );
+		gsl_vector *work= gsl_vector_calloc( N );
+		svd_dec(R,U,S,V);
+/*
+		output_matrix(R);
+		output_matrix(U);
+		output_vector(S);
+		output_matrix(V);
+*/
+		std::cout << "###INFO::TESTING###" << std::endl;
 /*
 		gsl_linalg_SV_decomp( Y, U, S, work );
 		gsl_matrix_memcpy( V, Y );
@@ -1580,7 +1594,7 @@ node_analysis::dimred_fit( ) {
 
 	gmat *P 	= gsl_matrix_calloc( DIM, c2.length_M() );
 	gmat *Q 	= gsl_matrix_calloc( DIM, c1.length_M() );
-
+	c2.copyM(P);
 	int n_p = 	c1.calc_largest_reduction(P);
 	int n_q = 	c2.calc_largest_reduction(Q);
 

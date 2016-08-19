@@ -48,6 +48,9 @@ BFACTOR=20
 bf=sqrt(BFACTOR/10.0/2.0)
 bf=0.0
 d2ij=zeros(N,N);
+M=12;
+Nij=zeros(N,N);
+
 for i=1:N
 	for j=1:N
 		d = sum((H(i,:)-H(j,:)).^2);
@@ -58,9 +61,12 @@ for i=1:N
 			d-=bf;
 		end
 		d2ij(i,j)=d;
+		Nij(i,j)=d;
 	end
 end
-
+sort(Nij,2);
+Nw=Nij(:,1:M);
+%[U,S,V]=svd(D); dim=sum(sum(S>1));E = S^0.5;e = E(:,1:dim);X = U*e;[u,s,v]=svd(X');Z=u*s(:,1:3);size(Z)
 D=zeros(N,N);
 
 for i=1:N
@@ -69,17 +75,17 @@ for i=1:N
 	end
 end
 
-dim=3;
 [ U , S , V ]	= svd(D);
-E		= S^0.5;
-e		= E(:,1:exp_dim);
-X		= U*e;
+dim=sum(sum(S>1));
+E = S^0.5;
+e = E(:,1:dim);
+X = U*e;
+% X = (U*V')(1:12,:)*e+centroid(H);
+%[ U, S ,V ]	= svd(U,1);
+%Z=U*S(:,1:3);
+%Y = U'*U*S*V'
 
-[ U, S ,V ]	= svd(U,1);
-Z=U*S(:,1:3);
-Y 		= U'*U*S*V'
-
-labels		= ones(N,1)*10;
-%test		= [ labels ones(N,1)*"  " num2str(X(:,1:exp_dim)) ]
+%labels		= ones(N,1)*10;
+%test		= [ labels ones(N,1)*"  " num2str(X(:,1:dim)) ]
 %save test.dat test
 

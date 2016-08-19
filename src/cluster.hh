@@ -47,7 +47,7 @@
 #define CLUSTER_H
 namespace richanalysis {
 
-	class clustering : public simple_ops , public tensorIO  {
+	class clustering : public linalg , public tensorIO  {
 		public:
 		//! null constructor
 			inline clustering() {} //!< Null constructor
