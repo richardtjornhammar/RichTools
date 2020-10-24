@@ -1,12 +1,18 @@
 language: c++
-sudo:required
+sudo: required
 os: linux
 dist: xenial
+
+addons:
+  apt:
+    packages:
+      - libgsl-dev
+      - libblas-dev
 
 compiler:
   - g++
 
-install: "libgsl libblas-common"
+install: "libgsl-dev libblas-dev"
 before_script:
   - cmake .
 
