@@ -1,9 +1,11 @@
 language: c++
-sudo: false
 compiler:
   - g++
 
+dist: xenial
+
 before_script:
+  - apt-get install libgsl0ldbl
   - cmake .
 
 script: make
