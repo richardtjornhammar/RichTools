@@ -1,11 +1,13 @@
 language: c++
+sudo:required
 compiler:
   - g++
 
 dist: xenial
 
 before_script:
-  - apt-get install libgsl0ldbl
+  - sudo apt-get install libgsl0ldbl
+  - sudo apt-get install libgsl-dev
   - cmake .
 
 script: make
