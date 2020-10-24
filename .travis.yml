@@ -1,13 +1,13 @@
 language: c++
 sudo:required
+os: linux
+dist: xenial
+
 compiler:
   - g++
 
-dist: xenial
-
+install: "libgsl libblas-common"
 before_script:
-  - sudo apt-get install libgsl0ldbl
-  - sudo apt-get install libgsl-dev
   - cmake .
 
 script: make
