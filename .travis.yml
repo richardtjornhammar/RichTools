@@ -12,7 +12,6 @@ addons:
 compiler:
   - g++
 
-install: "libgsl-dev libblas-dev"
 before_script:
   - cmake .
 
