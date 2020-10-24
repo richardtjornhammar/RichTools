@@ -12,6 +12,7 @@ addons:
 compiler:
   - g++
 
+
 before_script:
   - cmake .
 
