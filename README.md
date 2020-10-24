@@ -2,6 +2,7 @@
 Data analysis library for fitting and clustering
 
 # Build 
+[![Build Status](https://travis-ci.org/richardtjornhammar/RichTools.svg?branch=master)](https://travis-ci.org/richardtjornhammar/RichTools)
 
 To build the program issue the command:
 
