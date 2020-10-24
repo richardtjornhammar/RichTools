@@ -1,0 +1,9 @@
+language: c++
+sudo: false
+compiler:
+  - g++
+
+before_script:
+  - cmake .
+
+script: make
