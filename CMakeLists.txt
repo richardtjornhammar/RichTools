@@ -8,4 +8,4 @@ SET(CMAKE_CXX_STANDARD 11)
 SET(CMAKE_CXX_STANDARD_REQUIRED YES)
 
 add_executable(richtool ${SOURCES})
-target_link_libraries(richtool GSL::gsl GSL::gslcblas)
+target_link_libraries(richtool -lgsl -lblas)
