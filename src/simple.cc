@@ -125,6 +125,7 @@ coord_format::par2par( particles ipx, std::vector<int> ndx, int I ) {
 	}else{
 		std::cout << "ERROR::PAR2PAR" << std::endl;
 	}
+	return opx;
 }
 
 particles

@@ -104,7 +104,7 @@ class NodeGraph {
 		}
 		void set_root_id(std::string rid){ root_id_=rid; };
 		std::string get_root_id(void) { return root_id_; }
-		Node get_root(){get_node(root_id_);};
+		Node get_root(){return(get_node(root_id_));};
 
 		std::string DepthFirstSearch  ( void );
 		std::string BreadthFirstSearch( void );
@@ -197,6 +197,7 @@ void NodeGraph::show(void){
 	}
 }
 
+/*
 int main( int argc, char *argv[] )  // char
 {
 	int n_num=0 , n_chr=0 ;
@@ -258,3 +259,4 @@ int main( int argc, char *argv[] )  // char
 
 	return 0;
 }
+*/
